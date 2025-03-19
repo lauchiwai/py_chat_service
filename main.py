@@ -7,8 +7,33 @@ from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI
 import os
+
+# import custom modules
+from mongodb_init import mongodb
+from dependencies import get_db, verify_api_key
 # load .env
 load_dotenv()
+
+# fast config
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("app is starting...")
+    await mongodb.connect(app)  
+    deepseek.initialize()
+    yield  
+    print("app is closing...")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global mongodb_client
+    print("app is starting...")
+    await mongodb.connect(app) 
+    deepseek.initialize()
+
+    yield 
+    print("app is closing...")
+    await mongodb.close()
+
 # fast api setting 
 app = FastAPI(
     title="chat_service",

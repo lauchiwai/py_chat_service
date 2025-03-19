@@ -33,8 +33,5 @@ build/
 # 数据库相关（如 MongoDB 本地数据）
 data/
 
-# 依赖目录（如果 dependencies 是本地依赖）
-dependencies/
-
 # 其他
 .DS_Store
