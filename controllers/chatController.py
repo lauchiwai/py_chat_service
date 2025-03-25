@@ -1,0 +1,32 @@
+from services.chatService import ChatService
+from services.dependencies import get_chat_service
+
+from common.core.auth import get_current_user
+from common.core.llm_init.modal_config import ChatRequest
+
+from fastapi import APIRouter, HTTPException, Depends, Security
+
+router = APIRouter(prefix="/Chat", tags=["聊天管理"])
+@router.get("/getChatHistoryBySessionId/{chat_session_id}")
+async def get_chat_history_by_session_id(
+    chat_session_id: str,
+    service: ChatService = Depends(get_chat_service),
+):
+    """ get chat histoty by session_id from mongodb """
+    result = await service.get_chat_history_by_session_id(chat_session_id)
+    if (result.code == 200):
+        return result
+    else:
+        raise HTTPException(status_code=result.code, detail=result.message)
+    
+@router.post("/chat")
+async def chat_endpoint(
+    request: ChatRequest,
+    service: ChatService = Depends(get_chat_service),
+):
+    """process chat request"""
+    result = await service.chat_endpoint(request)
+    if (result.code == 200):
+        return result
+    else:
+        raise HTTPException(status_code=result.code, detail=result.message)

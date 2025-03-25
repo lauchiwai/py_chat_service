@@ -1,5 +1,5 @@
-from mongodb_init import mongodb
-from fastapi import HTTPException, Header
+from common.core.mongodb_init import mongodb
+from fastapi import HTTPException, Header, Depends
 import os
 
 async def get_db():
