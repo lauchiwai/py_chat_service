@@ -20,14 +20,6 @@ load_dotenv()
 # fast config
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("app is starting...")
-    await mongodb.connect(app)  
-    deepseek.initialize()
-    yield  
-    print("app is closing...")
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
     global mongodb_client
     print("app is starting...")
     await mongodb.connect(app) 
