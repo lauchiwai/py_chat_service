@@ -11,6 +11,7 @@ router = APIRouter(prefix="/Chat", tags=["聊天管理"])
 async def get_chat_history_by_session_id(
     chat_session_id: str,
     service: ChatService = Depends(get_chat_service),
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ):
     """ get chat histoty by session_id from mongodb """
     result = await service.get_chat_history_by_session_id(chat_session_id)
@@ -23,6 +24,7 @@ async def get_chat_history_by_session_id(
 async def chat_endpoint(
     request: ChatRequest,
     service: ChatService = Depends(get_chat_service),
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ):
     """process chat request"""
     result = await service.chat_endpoint(request)

@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
 
     yield 
     print("app is closing...")
-    await mongodb.close()
+    await mongodb.close() 
 
 # fast api setting 
 app = FastAPI(
@@ -45,6 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(vectorController.router)
 app.include_router(chatController.router)
 
 # start function
