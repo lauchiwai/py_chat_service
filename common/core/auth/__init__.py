@@ -15,6 +15,10 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     print("==== 到達依賴項 ====")
+    
+    if token.startswith("Bearer "):
+        token = token[7:].strip()
+        
     if not token:
         print("==== 沒有收到token ====")
         raise HTTPException(
