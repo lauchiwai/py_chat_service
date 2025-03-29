@@ -47,3 +47,19 @@ git commit -m "Initial commit for fastapi  project"
 ## 關聯到遠端 github
 
 git remote add origin https://github.com/lauchiwai/py_chat_service.git
+
+
+# docker command
+
+## 清理构建缓存
+
+docker-compose down -v --remove-orphans
+docker builder prune -af
+
+## 重新构建
+
+docker-compose up --build -d
+
+## 查看依赖安装情况
+
+docker exec -it py_chat_service-chat-service-1 pip list
