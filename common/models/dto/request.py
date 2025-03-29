@@ -8,8 +8,6 @@ class ChatRequest(BaseModel):
     
 class GenerateCollectionRequest(BaseModel):
     collection_name: str
-    vector_size: int = 384
-    distance: str = "COSINE"
 
 class TextPoint(BaseModel):
     text: str
@@ -22,6 +20,3 @@ class UpsertCollectionRequest(BaseModel):
 class VectorSearchRequest(BaseModel):
     collection_name: str
     query_text: str
-    min_score:float = 0.7
-    limit: int = 3
-    top_k:int = 10

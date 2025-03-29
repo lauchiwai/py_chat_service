@@ -25,22 +25,26 @@ class VectorService:
         try:
             if not qdrant_client.client.collection_exists(request.collection_name):
                 return ResultDTO.fail(code=404, message="集合不存在")
+            
+            min_score:float = 0.7
+            limit: int = 3
+            top_k:int = 10
         
             query_vector = embedding.model.encode(request.query_text).tolist()
             
             hits = qdrant_client.client.search(
                 collection_name=request.collection_name,
                 query_vector=query_vector,
-                limit=request.limit
+                limit=limit
             )
 
             filtered_results = [
                 VectorSearchResult(text=hit.payload["text"], score=hit.score)
                 for hit in hits
-                if hit.score >= request.min_score  
+                if hit.score >= min_score
             ]
 
-            top_results = filtered_results[:request.top_k]
+            top_results = filtered_results[:top_k]
             
             return ResultDTO.ok(data=top_results)
         except Exception as e:
@@ -79,11 +83,13 @@ class VectorService:
             if qdrant_client.client.collection_exists(request.collection_name):
                 return ResultDTO.fail(code=400, message="集合已存在")
             
+            vector_size: int = 384
+            distance: str = "COSINE"
             qdrant_client.client.create_collection(
                 collection_name=request.collection_name,
                 vectors_config=VectorParams(
-                    size=request.vector_size,
-                    distance=Distance[request.distance]
+                    size=vector_size,
+                    distance=Distance[distance]
                 )
             )
             return ResultDTO.ok(message=f"集合 {request.collection_name} 创建成功")

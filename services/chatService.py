@@ -1,5 +1,8 @@
 from datetime import datetime
 from services.vectorService import VectorService
+from typing import Optional, Union
+from common.core.llm_init.prompt import llm_prompt
+
 from common.core.llm_init import deepseek
 from common.models.dto.resultdto import ResultDTO
 from common.core.llm_init.modal_config import ChatRequest
@@ -11,7 +14,7 @@ class ChatService:
 
     async def get_chat_history_by_session_id(self, chat_session_id: str):
         try:
-            chat_history = await self.db.chat_histories.find_one({"chat_session_id": chat_session_id})
+            chat_history = await self.db.histories.find_one({"chat_session_id": chat_session_id})
             if not chat_history:
                 return ResultDTO.fail(code=404, message="chat history from session_id is not found")
 
@@ -25,7 +28,10 @@ class ChatService:
         
     async def chat_endpoint(self, request: ChatRequest):
         try:
-            chat_history = await self.db.chat_histories.find_one({"chat_session_id": request.chat_session_id})
+            temperature: Optional[float] = 0.7
+            max_tokens: Optional[int] = 1024
+            
+            chat_history = await self.db.histories.find_one({"chat_session_id": request.chat_session_id})
             # check chat history exist
             if not chat_history:
                 chat_history = {
@@ -34,7 +40,7 @@ class ChatService:
                     "messages": [
                         {
                             "role": "system",
-                            "content": request.system_prompt,
+                            "content": llm_prompt,
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         },
                         {
@@ -44,8 +50,8 @@ class ChatService:
                         }
                     ],
                     "metadata": {
-                        "temperature": request.temperature,
-                        "max_tokens": request.max_tokens
+                        "temperature": temperature,
+                        "max_tokens": max_tokens
                     }
                 }
             else:
@@ -83,8 +89,8 @@ class ChatService:
             response = deepseek.client.chat.completions.create(
                 model="deepseek-chat",
                 messages=enhanced_messages,
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
+                max_tokens=max_tokens,
+                temperature=temperature,
                 stream=False
             )
 
