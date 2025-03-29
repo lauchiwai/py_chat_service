@@ -24,7 +24,7 @@ class ChatService:
             })
             
         except Exception as e:
-            return ResultDTO.fail(code=500, message=str(e))
+            return ResultDTO.fail(code=400, message=str(e))
         
     async def chat_endpoint(self, request: ChatRequest):
         try:
@@ -113,4 +113,4 @@ class ChatService:
             })
 
         except Exception as e:
-            return ResultDTO.fail(code=500, message=str(e))
+            return ResultDTO.fail(code=400, message=str(e))

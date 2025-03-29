@@ -18,7 +18,7 @@ class VectorService:
             
             return ResultDTO.ok(data=converted)
         except Exception as e:
-            return ResultDTO.fail(code=500, message=str(e))
+            return ResultDTO.fail(code=400, message=str(e))
         
     def vector_semantic_search(self, request: VectorSearchRequest) -> ResultDTO[List[VectorSearchResult]]:
         """语义相似度搜索"""
@@ -48,7 +48,7 @@ class VectorService:
             
             return ResultDTO.ok(data=top_results)
         except Exception as e:
-            return ResultDTO.fail(code=500, message=str(e))
+            return ResultDTO.fail(code=400, message=str(e))
         
     def upsert_texts(self, request: UpsertCollectionRequest) -> ResultDTO:
         """批量插入文本数据"""
@@ -75,7 +75,7 @@ class VectorService:
             )
             return ResultDTO.ok(message=f"成功插入 {len(request.points)} 条数据")
         except Exception as e:
-            return ResultDTO.fail(code=500, message=str(e))
+            return ResultDTO.fail(code=400, message=str(e))
             
     def generate_collection(self,request: GenerateCollectionRequest) -> ResultDTO:
         """generate collections"""
@@ -94,4 +94,4 @@ class VectorService:
             )
             return ResultDTO.ok(message=f"集合 {request.collection_name} 创建成功")
         except Exception as e:
-            return ResultDTO.fail(code=500, message=str(e))
+            return ResultDTO.fail(code=400, message=str(e))

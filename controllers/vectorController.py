@@ -10,7 +10,7 @@ from common.models.dto.response import CollectionInfo, VectorSearchResult
 from typing import List
 
 router = APIRouter(prefix="/Vector", tags=["向量管理"])
-@router.get("", response_model=ResultDTO[List[CollectionInfo]])
+@router.get("/get_collections", response_model=ResultDTO[List[CollectionInfo]])
 def get_collections(
     service: VectorService = Depends(get_vector_service),
     user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 

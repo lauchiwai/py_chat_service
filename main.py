@@ -13,7 +13,7 @@ import uvicorn
 from controllers import vectorController, chatController
 from common.core.mongodb_init import mongodb
 from common.core.llm_init import deepseek
-from common.core.auth import oauth2_scheme
+from common.models.dto.resultdto import ResultDTO
 
 # load .env
 load_dotenv()
@@ -84,4 +84,4 @@ async def root():
 # heart beat
 @app.get("/health", dependencies=[])
 def health_check():
-    return {"status": "ok"}
+    return ResultDTO.ok()
