@@ -9,7 +9,7 @@ class MongoDB:
 
     async def connect(self, app: FastAPI):
         """ MongoDB connecting"""
-        uri = os.getenv("MONGODB_URL")
+        uri = f'mongodb://{os.getenv("MONGODB_USER")}:{os.getenv("MONGODB_PASSWORD")}@{os.getenv("MONGODB_HOST")}:{os.getenv("MONGODB_PORT")}/{os.getenv("MONGODB_Permission")}'
         db_name = os.getenv("MONGODB_DATABASE")
         
         try:
