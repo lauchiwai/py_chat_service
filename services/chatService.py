@@ -16,7 +16,10 @@ class ChatService:
         try:
             chat_history = await self.db.histories.find_one({"chat_session_id": chat_session_id})
             if not chat_history:
-                return ResultDTO.fail(code=404, message="chat history from session_id is not found")
+                return ResultDTO.ok(data={
+                    "response": [],
+                    "chat_session_id": chat_session_id
+                })
 
             return ResultDTO.ok(data={
                 "response": chat_history["messages"],
@@ -26,6 +29,28 @@ class ChatService:
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
         
+    async def delete_chat_history_by_session_id(self, chat_session_id: str):
+        try:
+            chat_history = await self.db.histories.find_one({"chat_session_id": chat_session_id})
+            if not chat_history:
+                return ResultDTO.fail(
+                    code=404,
+                    message=f"sessionId {chat_session_id} is not found"
+                )
+            else :
+                delete_result = await self.db.histories.delete_one({"_id": chat_history["_id"]})
+                if delete_result.deleted_count == 0:
+                    return ResultDTO.fail(
+                        code=500,
+                        message="Failed to delete chat history"
+                    )
+                return ResultDTO.ok(
+                    message=f"sessionId {chat_session_id} is delete"
+                )
+            
+        except Exception as e:
+            return ResultDTO.fail(code=400, message=str(e))
+           
     async def chat_endpoint(self, request: ChatRequest):
         try:
             temperature: Optional[float] = 0.7

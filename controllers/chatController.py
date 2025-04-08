@@ -20,6 +20,19 @@ async def get_chat_history_by_session_id(
     else:
         raise HTTPException(status_code=result.code, detail=result.message)
     
+@router.delete("/deleteChatHistoryBySessionId/{chat_session_id}")
+async def delete(
+    chat_session_id: str,
+    service: ChatService = Depends(get_chat_service),
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
+):
+    """ get chat histoty by session_id from mongodb """
+    result = await service.delete_chat_history_by_session_id(chat_session_id)
+    if (result.code == 200):
+        return result
+    else:
+        raise HTTPException(status_code=result.code, detail=result.message)
+    
 @router.post("/chat")
 async def chat_endpoint(
     request: ChatRequest,
