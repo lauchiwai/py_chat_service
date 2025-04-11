@@ -127,8 +127,6 @@ class ChatService:
                 chat_history = self.generate_chat_history(request)
             else:
                 self.chat_history_append(chat_history, request.message, "user")
-                
-            enhanced_messages = chat_history["messages"]
             
             if request.collection_name is not None:
                 search_result = self.vector_semantic_search(request)
@@ -137,6 +135,8 @@ class ChatService:
                     return ResultDTO.fail(code=search_result.code, message=search_result.message)
                 else : 
                     enhanced_messages = self.generate_enhanced_messages_by_vector_search(search_result, chat_history)
+            else :
+                enhanced_messages = chat_history["messages"]
                     
             response = self.llm_deepseek_endpoint(enhanced_messages)
 
@@ -156,3 +156,68 @@ class ChatService:
 
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
+    
+    def llm_deepseek_steam_endpoint(self, enhanced_messages, stream=False):
+        return deepseek.client.chat.completions.create(
+            model="deepseek-chat",
+            messages=enhanced_messages,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            stream=stream  
+        )
+    
+    async def chat_stream_endpoint(self, request: ChatRequest):
+        async def event_stream():
+            chat_history = None
+            full_response = ""
+            try:
+                chat_history = await self.db.histories.find_one({"chat_session_id": request.chat_session_id})
+                
+                if not chat_history:
+                    chat_history = self.generate_chat_history(request)
+                else:
+                    self.chat_history_append(chat_history, request.message, "user")
+                    
+                if request.collection_name is not None:
+                    search_result = self.vector_semantic_search(request)
+                    
+                    if search_result.code != 200:
+                        yield f"event: error\ndata: {json.dumps({'message': search_result.message})}\n\n"
+                        return
+                    else : 
+                        enhanced_messages = self.generate_enhanced_messages_by_vector_search(search_result, chat_history)
+                else :
+                    enhanced_messages = chat_history["messages"]
+                    
+                    
+                stream = await asyncio.to_thread(
+                    self.llm_deepseek_steam_endpoint, 
+                    enhanced_messages=enhanced_messages,
+                    stream=True
+                )
+                
+                for chunk in stream:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        full_response += content
+                        yield f"data: {json.dumps({'content': content})}\n\n"
+                
+                self.chat_history_append(chat_history, full_response, "assistant")
+                if chat_history.get("_id"):
+                    await self.db.histories.replace_one({"_id": chat_history["_id"]}, chat_history)
+                else:
+                    await self.db.histories.insert_one(chat_history)
+                
+                yield "event: end\ndata: {}\n\n"
+                
+            except Exception as e:
+                yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+        
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )

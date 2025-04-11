@@ -4,7 +4,10 @@ from services.dependencies import get_chat_service
 from common.core.auth import get_current_user
 from common.core.llm_init.modal_config import ChatRequest
 
-from fastapi import APIRouter, HTTPException, Depends, Security
+from fastapi import APIRouter, HTTPException, Depends, Security, Request
+from fastapi.responses import StreamingResponse
+
+import json
 
 router = APIRouter(prefix="/Chat", tags=["聊天管理"])
 @router.get("/getChatHistoryBySessionId/{chat_session_id}")
@@ -45,3 +48,11 @@ async def chat_endpoint(
         return result
     else:
         raise HTTPException(status_code=result.code, detail=result.message)
+    
+@router.post("/chat_stream")
+async def chat_stream(
+    request: ChatRequest,
+    service: ChatService = Depends(get_chat_service),
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"])
+):
+    return await service.chat_stream_endpoint(request)
