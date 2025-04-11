@@ -3,7 +3,7 @@ from services.vectorService import VectorService
 from typing import Optional, List, AsyncGenerator
 from fastapi.responses import StreamingResponse
 
-from common.core.llm_init.prompt import llm_prompt
+from common.core.llm_init.prompt import PromptTemplates
 from common.core.llm_init import deepseek
 from common.models.dto.resultdto import ResultDTO
 from common.core.llm_init.modal_config import ChatRequest
@@ -18,6 +18,7 @@ class ChatService:
         self.vector_service = vector_service
         self.temperature: Optional[float] = 0.7
         self.max_tokens: Optional[int] = 1024
+        self.prompt_templates = PromptTemplates()
 
     async def get_chat_history_by_session_id(self, chat_session_id: str):
         try:
@@ -65,7 +66,7 @@ class ChatService:
             "messages": [
                 {
                     "role": "system",
-                    "content": llm_prompt,
+                    "content": self.prompt_templates.general_assistant,
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 },
                 {
@@ -101,11 +102,13 @@ class ChatService:
             [f"[相關資料 {i+1}] {item.text}" for i, item in enumerate(search_result.data)]
         )
         
+        system_prompt = self.prompt_templates.rag_analyst(context_str)
         filtered_messages = [msg for msg in chat_history["messages"] if msg["role"] != "system"]
+        
         return [
             {
                 "role": "system",
-                "content": f"請基於以下上下文回答使用者的問題：\n{context_str}\n若上下文與問題無關，請根據自身知識回答。"
+                "content": system_prompt  
             },
             *filtered_messages
         ]
