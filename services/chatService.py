@@ -41,9 +41,8 @@ class ChatService:
         try:
             chat_history = await self.db.histories.find_one({"chat_session_id": chat_session_id})
             if not chat_history:
-                return ResultDTO.fail(
-                    code=404,
-                    message=f"sessionId {chat_session_id} is not found"
+                return ResultDTO.ok(
+                    message=f"sessionId {chat_session_id} have not chat history"
                 )
             else :
                 delete_result = await self.db.histories.delete_one({"_id": chat_history["_id"]})
