@@ -1,0 +1,78 @@
+name: py Chatroom Deployment
+
+on:
+  push:
+    branches: [release]
+    paths:
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'src/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: [self-hosted, Windows, X64]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        path: 'py_chat_service' 
+
+    - name: Inject Environment Variables
+      shell: cmd
+      working-directory: ./py_chat_service  
+      env:
+        APP_ENV: ${{ secrets.PY_APP_ENV }}
+        PYTHONUNBUFFERED: ${{ secrets.PY_PYTHONUNBUFFERED }}
+        CHAT_SERVICE_HOST: ${{ secrets.PY_CHAT_SERVICE_HOST }}
+        CHAT_SERVICE_PORT: ${{ secrets.PY_CHAT_SERVICE_PORT }}
+        JWT_SECRET_KEY: ${{ secrets.PY_JWT_SECRET_KEY }}
+        JWT_ISSUER: ${{ secrets.PY_JWT_ISSUER }}
+        JWT_ALGORITHM: ${{ secrets.PY_JWT_ALGORITHM }}
+        JWT_AUDIENCE: ${{ secrets.PY_JWT_AUDIENCE }}
+        DEEPSEEK_API_KEY: ${{ secrets.PY_DEEPSEEK_API_KEY }}
+        DEEPSEEK_BASE_URL: ${{ secrets.PY_DEEPSEEK_BASE_URL }}
+        DEEPSEEK_MODAL: ${{ secrets.PY_DEEPSEEK_MODAL }}
+        MONGODB_HOST: ${{ secrets.PY_MONGODB_HOST }}
+        MONGODB_USER: ${{ secrets.PY_MONGODB_USER }}
+        MONGODB_PASSWORD: ${{ secrets.PY_MONGODB_PASSWORD }}
+        MONGODB_PORT: ${{ secrets.PY_MONGODB_PORT }}
+        MONGODB_Permission: ${{ secrets.PY_MONGODB_Permission }}
+        MONGODB_DATABASE: ${{ secrets.PY_MONGODB_DATABASE }}
+        MONGODB_COLLECTION: ${{ secrets.PY_MONGODB_COLLECTION }}
+        QDRANT_CLOUD_URL: ${{ secrets.PY_QDRANT_CLOUD_URL }}
+        QDRANT_API_KEY: ${{ secrets.PY_QDRANT_API_KEY }}
+        MODEL_NAME: ${{ secrets.PY_MODEL_NAME }}
+      run: |
+        echo "Environment variables injected"
+
+    - name: Build Docker Image
+      working-directory: ./py_chat_service
+      run: |
+        docker build -t py-chat-service:${{ github.run_id }} .
+
+    - name: Deploy Services
+      working-directory: ./py_chat_service
+      env:
+        MONGODB_PASSWORD: ${{ secrets.PY_MONGODB_PASSWORD }}
+        QDRANT_API_KEY: ${{ secrets.PY_QDRANT_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.PY_DEEPSEEK_API_KEY }}
+      run: |
+        docker-compose down
+        docker-compose up -d
+        docker image prune -f
+
+    - name: Prune Old Images
+      run: |
+        $currentTag = "${{ github.run_id }}"
+        docker images --filter=reference='py-chat-service:*' --format "{{.Repository}}:{{.Tag}}" | Where-Object {
+          $_ -ne "py-chat-service:$currentTag"
+        } | ForEach-Object {
+          docker rmi -f $_
+        }
+
+    - name: System Cleanup
+      if: success()
+      run: |
+        docker system prune -f --filter "until=24h"
+        docker volume prune -f

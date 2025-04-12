@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  py-chat-service:
+    build: .
+    ports:
+      - "11114:11114"
+    env_file:
+      - .env
+    environment:
+      - MONGODB_HOST=my-mongo
+    networks:
+      - my_mongoDB_network
+      - chat_service_network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+networks:
+  my_mongoDB_network:
+    external: true
+  chat_service_network:
+    external: true
