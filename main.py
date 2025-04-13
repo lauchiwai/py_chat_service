@@ -4,31 +4,79 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 
+import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI
 import os
+import asyncio 
+import threading
 import uvicorn
+from typing import AsyncGenerator, Any
 
 # import custom modules
 from controllers import vectorController, chatController
 from common.core.mongodb_init import mongodb
 from common.core.llm_init import deepseek
 from common.models.dto.resultdto import ResultDTO
+from services.dependencies import get_chat_service_async
+from services.messaging.consumer import RabbitMQConsumer
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 # load .env
 load_dotenv()
 
+# app state        
+class AppState(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.consumer_task = None  
+        self.shutdown_event = asyncio.Event() 
+
+    def __getattr__(self, name):
+        return self[name]
+
+    def __setattr__(self, name, value):
+        self[name] = value
+        
 # fast config
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    global mongodb_client
-    print("app is starting...")
-    await mongodb.connect(app) 
-    deepseek.initialize()
+async def lifespan(app: FastAPI) -> AsyncGenerator[AppState, Any]:
+    state = AppState()
+    app.state = state 
+    
+    try:
+        logger.info("Application starting up...")
+        
+        await mongodb.connect(app)
+        logger.info("MongoDB connected")
+        
+        deepseek.initialize()
+        logger.info("LLM initialized")
+        
+        logger.info("Starting RabbitMQ consumer thread...")
+        chat_service = await get_chat_service_async()
+        consumer = RabbitMQConsumer(chat_service=chat_service) 
+        await consumer.connect()  
 
-    yield 
-    print("app is closing...")
-    await mongodb.close() 
+        state.consumer_task = asyncio.create_task(consumer.start_consuming())
+        
+        yield dict(state)
+        
+    finally:
+        logger.info("Application shutting down...")
+        if state.consumer_task and not state.consumer_task.done():
+            state.consumer_task.cancel()
+            try:
+                await state.consumer_task
+            except asyncio.CancelledError:
+                logger.info("Consumer task cancelled")
+        await consumer.graceful_shutdown()
 
 # fast api setting 
 app = FastAPI(
@@ -36,8 +84,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
-
-
 
 def custom_openapi():
     if app.openapi_schema:
