@@ -42,6 +42,9 @@ jobs:
         MONGODB_COLLECTION: ${{ secrets.PY_MONGODB_COLLECTION }}
         QDRANT_CLOUD_URL: ${{ secrets.PY_QDRANT_CLOUD_URL }}
         QDRANT_API_KEY: ${{ secrets.PY_QDRANT_API_KEY }}
+        RBMQ_HOSTNAME: ${{ secrets.RBMQ_HOSTNAME }}
+        RBMQ_USERNAME: ${{ secrets.RBMQ_USERNAME }}
+        RBMQ_PASSWORD: ${{ secrets.RBMQ_PASSWORD }}
         MODEL_NAME: ${{ secrets.PY_MODEL_NAME }}
       run: |
         echo "Environment variables injected"
@@ -49,11 +52,14 @@ jobs:
     - name: Build Docker Image
       working-directory: ./py_chat_service
       run: |
-        docker build -t py-chat-service:${{ github.run_id }} .
+        docker build -t "py-chat-service:${{ github.run_id }}" .
+        docker tag "py-chat-service:${{ github.run_id }}" py-chat-service:latest
+
 
     - name: Deploy Services
       working-directory: ./py_chat_service
       env:
+        DOCKER_IMAGE_NAME: "py-chat-service:${{ github.run_id }}"
         MONGODB_PASSWORD: ${{ secrets.PY_MONGODB_PASSWORD }}
         QDRANT_API_KEY: ${{ secrets.PY_QDRANT_API_KEY }}
         DEEPSEEK_API_KEY: ${{ secrets.PY_DEEPSEEK_API_KEY }}
