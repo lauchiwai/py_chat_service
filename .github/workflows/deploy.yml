@@ -3,11 +3,6 @@ name: py Chatroom Deployment
 on:
   push:
     branches: [release]
-    paths:
-      - 'docker-compose.yml'
-      - 'Dockerfile'
-      - '.dockerignore'
-      - 'src/**'
 
 jobs:
   build-and-deploy:
@@ -52,30 +47,23 @@ jobs:
     - name: Build Docker Image
       working-directory: ./py_chat_service
       run: |
-        docker build -t "py-chat-service:${{ github.run_id }}" .
-        docker tag "py-chat-service:${{ github.run_id }}" py-chat-service:latest
-
+        docker build -t py-chat-service:latest . 
 
     - name: Deploy Services
       working-directory: ./py_chat_service
       env:
-        DOCKER_IMAGE_NAME: "py-chat-service:${{ github.run_id }}"
         MONGODB_PASSWORD: ${{ secrets.PY_MONGODB_PASSWORD }}
         QDRANT_API_KEY: ${{ secrets.PY_QDRANT_API_KEY }}
         DEEPSEEK_API_KEY: ${{ secrets.PY_DEEPSEEK_API_KEY }}
       run: |
         docker-compose down
         docker-compose up -d
-        docker image prune -f
 
     - name: Prune Old Images
       run: |
-        $currentTag = "${{ github.run_id }}"
-        docker images --filter=reference='py-chat-service:*' --format "{{.Repository}}:{{.Tag}}" | Where-Object {
-          $_ -ne "py-chat-service:$currentTag"
-        } | ForEach-Object {
-          docker rmi -f $_
-        }
+          docker images "py-chat-service" --filter=reference='py-chat-service:*' --format "{{.Repository}}:{{.Tag}}" | 
+          Where-Object { $_ -ne "py-chat-service:latest" } | 
+          ForEach-Object { docker rmi -f $_ }
 
     - name: System Cleanup
       if: success()

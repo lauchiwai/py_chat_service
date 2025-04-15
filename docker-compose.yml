@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   py-chat-service:
-    image: ${DOCKER_IMAGE_NAME:-py-chat-service}
+    image: py-chat-service:latest
     build: .
     ports:
       - "11114:11114"
