@@ -144,7 +144,6 @@ class ChatService:
                 else :
                     enhanced_messages = chat_history["messages"]
                     
-                    
                 stream = await asyncio.to_thread(
                     self.llm_deepseek_steam_endpoint, 
                     enhanced_messages=enhanced_messages,

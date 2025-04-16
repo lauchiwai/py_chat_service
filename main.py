@@ -55,7 +55,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[AppState, Any]:
         
         await mongodb.connect(app)
         logger.info("MongoDB connected")
-        
         deepseek.initialize()
         logger.info("LLM initialized")
         
@@ -109,9 +108,14 @@ def custom_openapi():
 app.openapi = custom_openapi 
 
 # middleware
+origins = [
+    "https://api.oniind244.online/",
+    "http://localhost:11115",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["Authorization", "Content-Type"],
     expose_headers=["*"]
