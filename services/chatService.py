@@ -111,53 +111,6 @@ class ChatService:
             },
             *filtered_messages
         ]
-
-    def llm_deepseek_endpoint(self, enhanced_messages) :
-        return deepseek.client.chat.completions.create(
-            model="deepseek-chat",
-            messages=enhanced_messages,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            stream=False
-        )
-         
-    async def chat_endpoint(self, request: ChatRequest):
-        try:
-            chat_history = await self.db.histories.find_one({"chat_session_id": request.chat_session_id})
-            
-            if not chat_history:
-                chat_history = self.generate_chat_history(request)
-            else:
-                self.chat_history_append(chat_history, request.message, "user")
-            
-            if request.collection_name is not None:
-                search_result = self.vector_semantic_search(request)
-                
-                if search_result.code != 200:
-                    return ResultDTO.fail(code=search_result.code, message=search_result.message)
-                else : 
-                    enhanced_messages = self.generate_enhanced_messages_by_vector_search(search_result, chat_history)
-            else :
-                enhanced_messages = chat_history["messages"]
-                    
-            response = self.llm_deepseek_endpoint(enhanced_messages)
-
-            assistant_msg = response.choices[0].message.content
-
-            self.chat_history_append(chat_history, assistant_msg, "assistant")
-
-            if chat_history.get("_id"):  
-                await self.db.histories.replace_one({"_id": chat_history["_id"]}, chat_history)
-            else:  
-                await self.db.histories.insert_one(chat_history)
-
-            return ResultDTO.ok(data={
-                "response": assistant_msg,
-                "chat_session_id": request.chat_session_id
-            })
-
-        except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
     
     def llm_deepseek_steam_endpoint(self, enhanced_messages, stream=False):
         return deepseek.client.chat.completions.create(

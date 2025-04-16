@@ -34,19 +34,6 @@ async def delete(
     else:
         raise HTTPException(status_code=result.code, detail=result.message)
     
-@router.post("/chat")
-async def chat_endpoint(
-    request: ChatRequest,
-    service: ChatService = Depends(get_chat_service),
-    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
-):
-    """process chat request"""
-    result = await service.chat_endpoint(request)
-    if (result.code == 200):
-        return result
-    else:
-        raise HTTPException(status_code=result.code, detail=result.message)
-    
 @router.post("/chat_stream")
 async def chat_stream(
     request: ChatRequest,
