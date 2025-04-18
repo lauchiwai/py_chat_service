@@ -17,7 +17,7 @@ class ChatService:
         self.db = db
         self.vector_service = vector_service
         self.temperature: Optional[float] = 0.7
-        self.max_tokens: Optional[int] = 1024
+        self.max_tokens: Optional[int] = 3000
         self.prompt_templates = PromptTemplates()
 
     async def get_chat_history_by_session_id(self, chat_session_id: str):
