@@ -19,7 +19,7 @@ class RabbitMQConsumer:
         self.chat_service = chat_service
         self.connection: Optional[aio_pika.RobustConnection] = None
         self.channel: Optional[aio_pika.Channel] = None
-        self._shutdown_flag = asyncio.Event()  # Using async event instead of threading.Event
+        self._shutdown_flag = asyncio.Event()  
 
     async def connect(self):
         """Initialize RabbitMQ connection"""
@@ -31,7 +31,7 @@ class RabbitMQConsumer:
                 timeout=10  
             )
             self.channel = await self.connection.channel()
-            await self.channel.set_qos(prefetch_count=10)  # Control concurrency
+            await self.channel.set_qos(prefetch_count=10)
             await self._declare_infrastructure()
         except Exception as e:
             logging.error(f"Failed to connect to RabbitMQ: {str(e)}")
@@ -75,14 +75,14 @@ class RabbitMQConsumer:
 
     async def _on_message(self, message: aio_pika.IncomingMessage):
         """Asynchronous message processing"""
-        async with message.process(ignore_processed=True):  # Automatic acknowledgment control
+        async with message.process(ignore_processed=True):  
             try:
                 data = json.loads(message.body.decode())
                 session_id = data.get("session_id") or data.get("sessionId") or data.get("SessionId")
                 
                 if not session_id:
                     logging.error("Message missing session_id")
-                    await message.reject(requeue=False)  # Send to DLQ directly
+                    await message.reject(requeue=False)  
                     return
                 
                 # Async retry logic
@@ -98,11 +98,11 @@ class RabbitMQConsumer:
                             logging.info(f"Session deleted successfully: {session_id}")
                         else:
                             logging.error(f"Deletion failed: {result.message}")
-                            raise RuntimeError(result.message)  # Trigger retry
+                            raise RuntimeError(result.message) 
                             
             except Exception as e:
                 logging.error(f"Error processing message: {str(e)}", exc_info=True)
-                await message.reject(requeue=False)  # Finally sent to DLQ
+                await message.reject(requeue=False) 
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _process_deletion(self, session_id: str) -> ResultDTO:

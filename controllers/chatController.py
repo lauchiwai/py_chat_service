@@ -7,7 +7,7 @@ from common.core.llm_init.modal_config import ChatRequest
 from fastapi import APIRouter, HTTPException, Depends, Security, Request
 from fastapi.responses import StreamingResponse
 
-router = APIRouter(prefix="/Chat", tags=["聊天管理"])
+router = APIRouter(prefix="/Chat", tags=["Chat Management"])
 @router.get("/getChatHistoryBySessionId/{chat_session_id}")
 async def get_chat_history_by_session_id(
     chat_session_id: str,

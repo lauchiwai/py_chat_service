@@ -21,10 +21,10 @@ class VectorService:
             return ResultDTO.fail(code=400, message=str(e))
         
     def vector_semantic_search(self, request: VectorSearchRequest) -> ResultDTO[List[VectorSearchResult]]:
-        """语义相似度搜索"""
+        """vector semantic search"""
         try:
             if not qdrant_client.client.collection_exists(request.collection_name):
-                return ResultDTO.fail(code=404, message="集合不存在")
+                return ResultDTO.fail(code=404, message="Collection not found")
             
             min_score:float = 0.7
             limit: int = 3
@@ -51,12 +51,11 @@ class VectorService:
             return ResultDTO.fail(code=400, message=str(e))
         
     def upsert_texts(self, request: UpsertCollectionRequest) -> ResultDTO:
-        """批量插入文本数据"""
+        """upsert texts"""
         if not qdrant_client.client.collection_exists(request.collection_name):
-            return ResultDTO.fail(code=404, message="集合不存在")
+            return ResultDTO.fail(code=404, message="Collection not found")
         
         try:
-            # 生成向量
             texts = [p.text for p in request.points]
             vectors = embedding.model.encode(texts).tolist()
             
@@ -73,7 +72,7 @@ class VectorService:
                 collection_name=request.collection_name,
                 points=request.points
             )
-            return ResultDTO.ok(message=f"成功插入 {len(request.points)} 条数据")
+            return ResultDTO.ok(message=f"Successfully inserted {len(request.points)} data")
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
             
@@ -81,7 +80,7 @@ class VectorService:
         """generate collections"""
         try:
             if qdrant_client.client.collection_exists(request.collection_name):
-                return ResultDTO.fail(code=400, message="集合已存在")
+                return ResultDTO.fail(code=400, message="Collection already exists")
             
             vector_size: int = 384
             distance: str = "COSINE"
@@ -92,6 +91,6 @@ class VectorService:
                     distance=Distance[distance]
                 )
             )
-            return ResultDTO.ok(message=f"集合 {request.collection_name} 创建成功")
+            return ResultDTO.ok(message=f"Collection {request.collection_name} create Successful")
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))

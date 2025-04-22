@@ -40,6 +40,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         
         return payload
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token 已過期")
+        raise HTTPException(status_code=401, detail="Token has expired")
     except Exception as e:
-        raise HTTPException(status_code=401, detail="無效Token")
+        raise HTTPException(status_code=401, detail="Invalid Token")
