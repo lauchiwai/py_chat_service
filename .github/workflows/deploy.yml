@@ -44,6 +44,35 @@ jobs:
       run: |
         echo "Environment variables injected"
 
+    - name: Create .env.production File
+      shell: cmd
+      working-directory: ./py_chat_service
+      run: |
+        echo APP_ENV=${{ secrets.PY_APP_ENV }} > .env.production
+        echo PYTHONUNBUFFERED=${{ secrets.PY_PYTHONUNBUFFERED }} >> .env.production
+        echo CHAT_SERVICE_HOST=${{ secrets.PY_CHAT_SERVICE_HOST }} >> .env.production
+        echo CHAT_SERVICE_PORT=${{ secrets.PY_CHAT_SERVICE_PORT }} >> .env.production
+        echo JWT_SECRET_KEY=${{ secrets.PY_JWT_SECRET_KEY }} >> .env.production
+        echo JWT_ISSUER=${{ secrets.PY_JWT_ISSUER }} >> .env.production
+        echo JWT_ALGORITHM=${{ secrets.PY_JWT_ALGORITHM }} >> .env.production
+        echo JWT_AUDIENCE=${{ secrets.PY_JWT_AUDIENCE }} >> .env.production
+        echo DEEPSEEK_API_KEY=${{ secrets.PY_DEEPSEEK_API_KEY }} >> .env.production
+        echo DEEPSEEK_BASE_URL=${{ secrets.PY_DEEPSEEK_BASE_URL }} >> .env.production
+        echo DEEPSEEK_MODAL=${{ secrets.PY_DEEPSEEK_MODAL }} >> .env.production
+        echo MONGODB_HOST=${{ secrets.PY_MONGODB_HOST }} >> .env.production
+        echo MONGODB_USER=${{ secrets.PY_MONGODB_USER }} >> .env.production
+        echo MONGODB_PASSWORD=${{ secrets.PY_MONGODB_PASSWORD }} >> .env.production
+        echo MONGODB_PORT=${{ secrets.PY_MONGODB_PORT }} >> .env.production
+        echo MONGODB_Permission=${{ secrets.PY_MONGODB_Permission }} >> .env.production
+        echo MONGODB_DATABASE=${{ secrets.PY_MONGODB_DATABASE }} >> .env.production
+        echo MONGODB_COLLECTION=${{ secrets.PY_MONGODB_COLLECTION }} >> .env.production
+        echo QDRANT_CLOUD_URL=${{ secrets.PY_QDRANT_CLOUD_URL }} >> .env.production
+        echo QDRANT_API_KEY=${{ secrets.PY_QDRANT_API_KEY }} >> .env.production
+        echo RBMQ_HOSTNAME=${{ secrets.RBMQ_HOSTNAME }} >> .env.production
+        echo RBMQ_USERNAME=${{ secrets.RBMQ_USERNAME }} >> .env.production
+        echo RBMQ_PASSWORD=${{ secrets.RBMQ_PASSWORD }} >> .env.production
+        echo MODEL_NAME=${{ secrets.PY_MODEL_NAME }} >> .env.production
+
     - name: Build Docker Image
       working-directory: ./py_chat_service
       run: |
