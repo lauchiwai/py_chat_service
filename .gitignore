@@ -5,6 +5,7 @@
 *.pyd
 .env
 .venv
+.env.*
 env/
 venv/
 ENV/
