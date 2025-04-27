@@ -100,8 +100,7 @@ class ChatService:
         return self.vector_service.vector_semantic_search(
             VectorSearchRequest(
                 collection_name=request.collection_name,
-                query_text=request.message,
-                limit=3
+                query_text=request.message
             )
         )
     
@@ -160,7 +159,7 @@ class ChatService:
                         current_time = datetime.now()
                         elapsed = (current_time - last_send).total_seconds()
                         
-                        if elapsed > 0.3 or len(buffer) > 400:
+                        if elapsed > 0.1 or len(buffer) > 100:
                             yield f"data: {json.dumps({'content': buffer})}\n\n"
                             buffer = ""
                             last_send = current_time
