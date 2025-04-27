@@ -106,7 +106,7 @@ class ChatService:
     
     def generate_enhanced_messages_by_vector_search(self, search_result, chat_history):
         context_str = "\n".join(
-            [f"[相關資料 {i+1}] {item.text}" for i, item in enumerate(search_result.data)]
+            [f"{item.text}" for i, item in enumerate(search_result.data)]
         )
         system_prompt = self.prompt_templates.rag_analyst(context_str)
         filtered_messages = [msg for msg in chat_history["messages"] if msg["role"] != "system"]
@@ -145,8 +145,7 @@ class ChatService:
 
                 stream = self.llm_deepseek_steam_endpoint(enhanced_messages, stream=True)
                 
-                last_send = datetime.now()
-                buffer = ""
+                buffer = ""                
                 for chunk in stream:
                     if not chunk.choices:
                         continue
@@ -155,15 +154,8 @@ class ChatService:
                     if content:
                         full_response += content
                         buffer += content
-
-                        current_time = datetime.now()
-                        elapsed = (current_time - last_send).total_seconds()
-                        
-                        if elapsed > 0.1 or len(buffer) > 100:
-                            yield f"data: {json.dumps({'content': buffer})}\n\n"
-                            buffer = ""
-                            last_send = current_time
-                            await asyncio.sleep(0.001)
+                        yield f"data: {json.dumps({'content': buffer})}\n\n"
+                        buffer = ""
 
                 if buffer:
                     yield f"data: {json.dumps({'content': buffer})}\n\n"
