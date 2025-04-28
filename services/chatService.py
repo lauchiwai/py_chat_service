@@ -90,11 +90,29 @@ class ChatService:
     async def save_chat_history(self, chat_history):
         if not chat_history:
             return
-            
-        if chat_history.get("_id"):
-            await self.db.histories.replace_one({"_id": chat_history["_id"]}, chat_history)
-        else:
-            await self.db.histories.insert_one(chat_history)
+        
+        retries = 3 
+        for attempt in range(retries):
+            try:
+                if chat_history.get("_id"):
+                    result = await self.db.histories.replace_one(
+                        {"_id": chat_history["_id"]},
+                        chat_history,
+                        upsert=True  
+                    )
+                else:
+                    result = await self.db.histories.insert_one(chat_history)
+                
+                if result.acknowledged:
+                    print(f"Chat history saved for session: {chat_history['chat_session_id']}")
+                    return
+                else:
+                    raise Exception("Database write not acknowledged")
+                    
+            except Exception as e:
+                if attempt == retries - 1:
+                    print(f"Failed to save chat history after {retries} attempts: {str(e)}")
+                await asyncio.sleep(0.5 * (attempt + 1))
                 
     def vector_semantic_search(self, request):
         return self.vector_service.vector_semantic_search(
@@ -111,21 +129,35 @@ class ChatService:
         system_prompt = self.prompt_templates.rag_analyst(context_str)
         filtered_messages = [msg for msg in chat_history["messages"] if msg["role"] != "system"]
         return [{"role": "system", "content": system_prompt}, *filtered_messages]
-    
-    def llm_deepseek_steam_endpoint(self, enhanced_messages, stream=False):
-        return deepseek.client.chat.completions.create(
-            model="deepseek-chat",
-            messages=enhanced_messages,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            stream=stream  
-        )
+        
+    async def llm_deepseek_steam_endpoint(self, enhanced_messages, stream=False, timeout=30):
+        try:
+            response = await asyncio.wait_for(
+                deepseek.client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=enhanced_messages,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                    stream=stream
+                ),
+                timeout=timeout
+            )
+            return response
+        except asyncio.TimeoutError:
+            print("Deepseek request timed out")
+            raise
     
     async def chat_stream_endpoint(self, request):
         async def event_stream():
             chat_history = None
             full_response = ""
+            
+            llm_task = None
+            client_disconnected = False
             try:
+                client_disconnected = False
+                task = asyncio.current_task()
+                
                 chat_history = await self.db.histories.find_one({"chat_session_id": request.chat_session_id})
                 if not chat_history:
                     chat_history = self.generate_chat_history(request)
@@ -143,10 +175,16 @@ class ChatService:
                 else:
                     enhanced_messages = chat_history["messages"]
 
-                stream = self.llm_deepseek_steam_endpoint(enhanced_messages, stream=True)
+                llm_task = asyncio.create_task(
+                    self.llm_deepseek_steam_endpoint(enhanced_messages, stream=True, timeout=1)
+                )
+                stream = await llm_task
                 
                 buffer = ""                
-                for chunk in stream:
+                async for chunk in stream:
+                    if task.done() or client_disconnected:
+                        break
+                    
                     if not chunk.choices:
                         continue
                         
@@ -154,26 +192,35 @@ class ChatService:
                     if content:
                         full_response += content
                         buffer += content
-                        yield f"data: {json.dumps({'content': buffer})}\n\n"
-                        buffer = ""
-
-                if buffer:
-                    yield f"data: {json.dumps({'content': buffer})}\n\n"
-                
-                self.chat_history_append(chat_history, full_response, "assistant")
+                        try:
+                            yield f"data: {json.dumps({'content': buffer})}\n\n"
+                            buffer = ""
+                        except Exception as e:
+                            client_disconnected = True
+                            print(f"Client disconnected: {e}")
+                            break
+                        
                 yield "event: end\ndata: {}\n\n"
-
+                
+            except asyncio.CancelledError:
+                print("Streaming request cancelled")
+                client_disconnected = True
+                if llm_task and not llm_task.done():
+                    llm_task.cancel()  
+                    try:
+                        await llm_task
+                    except asyncio.CancelledError:
+                        pass
+            
             except Exception as e:
                 error_msg = str(e)
-                if not chat_history:
-                    chat_history = self.generate_chat_history(request)
                 self.chat_history_append(chat_history, f"系統錯誤: {error_msg}", "system")
                 yield f"event: error\ndata: {json.dumps({'message': error_msg})}\n\n"
-                yield "event: end\ndata: {}\n\n"
 
             finally:
                 if chat_history:
-                    asyncio.create_task(self.save_chat_history(chat_history))
+                    self.chat_history_append(chat_history, full_response, "assistant")
+                    await self.save_chat_history(chat_history)
 
         return StreamingResponse(
             event_stream(),

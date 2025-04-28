@@ -1,5 +1,5 @@
 import os
-from openai import OpenAI
+from openai import AsyncOpenAI
 from fastapi import HTTPException
 
 class DeepseekClient:
@@ -17,9 +17,10 @@ class DeepseekClient:
                 detail=" Deepseek API init fail"
             )
             
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(  
             api_key=api_key,
-            base_url=base_url
+            base_url=base_url,
+            timeout=30.0  
         )
         return self.client
 
