@@ -113,14 +113,14 @@ class ChatService:
                 if attempt == retries - 1:
                     print(f"Failed to save chat history after {retries} attempts: {str(e)}")
                 await asyncio.sleep(0.5 * (attempt + 1))
-                
-    def vector_semantic_search(self, request):
-        return self.vector_service.vector_semantic_search(
-            VectorSearchRequest(
-                collection_name=request.collection_name,
-                query_text=request.message
-            )
+        
+    async def vector_semantic_search(self, request):
+        return await self.vector_service.vector_semantic_search(
+        VectorSearchRequest(
+            collection_name=request.collection_name,
+            query_text=request.message
         )
+    )
     
     def generate_enhanced_messages_by_vector_search(self, search_result, chat_history):
         context_str = "\n".join(
@@ -166,7 +166,7 @@ class ChatService:
 
                 enhanced_messages = []
                 if request.collection_name:
-                    search_result = self.vector_semantic_search(request)
+                    search_result = await self.vector_semantic_search(request)
                     if search_result.code != 200:
                         yield f"event: error\ndata: {json.dumps({'message': search_result.message})}\n\n"
                         yield "event: end\ndata: {}\n\n"
@@ -175,12 +175,9 @@ class ChatService:
                 else:
                     enhanced_messages = chat_history["messages"]
 
-                llm_task = asyncio.create_task(
-                    self.llm_deepseek_steam_endpoint(enhanced_messages, stream=True, timeout=1)
-                )
+                buffer = ""   
+                llm_task = asyncio.create_task(self.llm_deepseek_steam_endpoint(enhanced_messages, stream=True, timeout=30))
                 stream = await llm_task
-                
-                buffer = ""                
                 async for chunk in stream:
                     if task.done() or client_disconnected:
                         break
@@ -193,7 +190,8 @@ class ChatService:
                         full_response += content
                         buffer += content
                         try:
-                            yield f"data: {json.dumps({'content': buffer})}\n\n"
+                            data = await asyncio.to_thread(json.dumps, {"content": buffer})
+                            yield f"data: {data}\n\n"
                             buffer = ""
                         except Exception as e:
                             client_disconnected = True
@@ -231,3 +229,4 @@ class ChatService:
                 "X-Accel-Buffering": "no"
             }
         )
+        

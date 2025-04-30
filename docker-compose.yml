@@ -15,8 +15,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 2G
+          cpus: '4'
+          memory: 3G
 
 networks:
   rbmq-network:

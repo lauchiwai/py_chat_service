@@ -1,3 +1,5 @@
+import asyncio, os
+from concurrent.futures import ThreadPoolExecutor
 from common.models.dto.resultdto import ResultDTO
 from common.models.dto.response import CollectionInfo, VectorSearchResult
 from common.models.dto.request import GenerateCollectionRequest, VectorSearchRequest, UpsertCollectionRequest
@@ -5,17 +7,23 @@ from common.core.qdrant_client_init import qdrant_client
 from common.core.embedding_init import embedding
 from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchText
 from typing import List, Dict
-import re
+from concurrent.futures import ThreadPoolExecutor
 
+max_workers = min(32, (os.cpu_count() or 4) + 4) 
+embedding_executor = ThreadPoolExecutor(max_workers=max_workers)
 class VectorService:
-    def get_all_collections(self) -> ResultDTO[List[CollectionInfo]]:
+    def __init__(self):
+        self.thread_pool = embedding_executor 
+        
+    async def close(self):
+        """close thread pool"""
+        self.thread_pool.shutdown(wait=True) 
+
+    async def get_all_collections(self) -> ResultDTO[List[CollectionInfo]]:
         try:
-            response = qdrant_client.client.get_collections().collections
-            converted = [
-                CollectionInfo(name=col.name)
-                for col in response
-            ]
-            
+            response = await qdrant_client.client.get_collections() 
+            collections = response.collections  
+            converted = [CollectionInfo(name=col.name) for col in collections]
             return ResultDTO.ok(data=converted)
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
@@ -32,19 +40,23 @@ class VectorService:
         
         return " ".join(list(set(expanded_terms)))
     
+    def _encode_text(self, text: str):
+        return embedding.model.encode(text).tolist()
 
-    def _enhance_encoding(self, text: str) -> List[float]:
-        processed_text = f"問題：{text.strip()}"  
-        cleaned_text = re.sub(r'[^\w\u4e00-\u9fff]', ' ', processed_text)
-        cleaned_text = re.sub(r'\s+', ' ', cleaned_text)  
-        return embedding.model.encode(cleaned_text).tolist()
+    async def _enhance_encoding(self, text: str) -> List[float]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self.thread_pool,
+            self._encode_text,  
+            text
+        )
     
-    def _hybrid_search(self, collection: str, vector: List[float], query: str, limit: int) -> List:
+    async def _hybrid_search(self, collection: str, vector: List[float], query: str, limit: int) -> List:
         keyword_filter = Filter(
             must=[FieldCondition(key="text", match=MatchText(text=query))]
         )
         
-        return qdrant_client.client.search(
+        return await qdrant_client.client.search(
             collection_name=collection,
             query_vector=vector,
             query_filter=keyword_filter,  
@@ -57,10 +69,10 @@ class VectorService:
         available_length = max_length - len(prefix)
         return f"{prefix}{original_text[:available_length]}" 
         
-    def vector_semantic_search(self, request: VectorSearchRequest) -> ResultDTO[List[VectorSearchResult]]:
+    async def vector_semantic_search(self, request: VectorSearchRequest) -> ResultDTO[List[VectorSearchResult]]:
         """vector semantic search"""
         try:
-            if not qdrant_client.client.collection_exists(request.collection_name):
+            if not await qdrant_client.client.collection_exists(request.collection_name):
                 return ResultDTO.fail(code=404, message="Collection not found")
             
             HARDCODE_LIMIT = 5
@@ -68,9 +80,9 @@ class VectorService:
             
             expanded_query = self._expand_query(request.query_text)
             
-            query_vector = self._enhance_encoding(expanded_query)
+            query_vector = await self._enhance_encoding(expanded_query)
             
-            hits = self._hybrid_search(
+            hits = await self._hybrid_search(
                 collection=request.collection_name,
                 vector=query_vector,
                 query=expanded_query,  
@@ -97,15 +109,18 @@ class VectorService:
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
         
-    def upsert_texts(self, request: UpsertCollectionRequest) -> ResultDTO:
+    async def upsert_texts(self, request: UpsertCollectionRequest) -> ResultDTO:
         """upsert texts"""
-        if not qdrant_client.client.collection_exists(request.collection_name):
+        if not await qdrant_client.client.collection_exists(request.collection_name):
             return ResultDTO.fail(code=404, message="Collection not found")
         
         try:
             texts = [p.text for p in request.points]
-            vectors = embedding.model.encode(texts).tolist()
-            
+            loop = asyncio.get_running_loop()
+            vectors = await loop.run_in_executor(
+                self.thread_pool,
+                lambda: embedding.model.encode(texts).tolist()
+            )
             request.points = [
                 PointStruct(
                     id=p.id or idx,
@@ -115,7 +130,7 @@ class VectorService:
                 for idx, (p, vector) in enumerate(zip(request.points, vectors))
             ]
             
-            qdrant_client.client.upsert(
+            await qdrant_client.client.upsert(
                 collection_name=request.collection_name,
                 points=request.points
             )
@@ -123,15 +138,15 @@ class VectorService:
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
             
-    def generate_collection(self,request: GenerateCollectionRequest) -> ResultDTO:
+    async def generate_collection(self,request: GenerateCollectionRequest) -> ResultDTO:
         """generate collections"""
         try:
-            if qdrant_client.client.collection_exists(request.collection_name):
+            if await qdrant_client.client.collection_exists(request.collection_name):
                 return ResultDTO.fail(code=400, message="Collection already exists")
             
             vector_size: int = 384
             distance: str = "COSINE"
-            qdrant_client.client.create_collection(
+            await qdrant_client.client.create_collection(
                 collection_name=request.collection_name,
                 vectors_config=VectorParams(
                     size=vector_size,

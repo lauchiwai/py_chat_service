@@ -4,13 +4,9 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 
-import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI
-import os
-import asyncio 
-import threading
-import uvicorn
+import os, asyncio, uvicorn, logging
 from typing import AsyncGenerator, Any
 
 # import custom modules
@@ -126,8 +122,16 @@ app.include_router(chatController.router)
 
 # start function
 if __name__ == "__main__":
-    uvicorn.run("main:app", host=os.getenv("CHAT_SERVICE_HOST"), port=int(os.getenv("CHAT_SERVICE_PORT")), reload=True)
-
+    uvicorn.run(
+        "main:app", 
+        workers=4,                              
+        limit_concurrency=1000,   
+        timeout_keep_alive=30,
+        host=os.getenv("CHAT_SERVICE_HOST"), 
+        port=int(os.getenv("CHAT_SERVICE_PORT")), 
+        reload=True
+    )
+    
 # redirect
 @app.get("/", include_in_schema=False)
 async def root():

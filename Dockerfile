@@ -26,4 +26,4 @@ WORKDIR /app
 COPY . .
 
 EXPOSE 11114
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:11114", "main:app"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "--bind", "0.0.0.0:11114", "--keep-alive", "30", "--worker-connections", "1000", "--reload", "main:app"]

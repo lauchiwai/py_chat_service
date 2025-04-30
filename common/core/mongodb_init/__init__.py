@@ -6,9 +6,7 @@ import os
 class MongoDB:
     def __init__(self):
         self.async_client = None
-        self.sync_client = None
         self.db = None
-        self.sync_db = None
 
     async def connect(self, app: FastAPI):
         """ MongoDB connecting"""
@@ -18,9 +16,6 @@ class MongoDB:
         try:
             self.async_client = AsyncIOMotorClient(uri)
             self.db = self.async_client[db_name]
-            
-            self.sync_client = MongoClient(uri)
-            self.sync_db = self.sync_client[db_name]
             
             app.mongodb = self  
             print("MongoDB connected")
@@ -32,8 +27,6 @@ class MongoDB:
         """close mongodb connect"""
         if self.async_client:
             self.async_client.close()
-        if self.sync_client:
-            self.sync_client.close()
-            print("MongoDB connect is closed")
+        print("MongoDB connect is closed")
 
 mongodb = MongoDB()

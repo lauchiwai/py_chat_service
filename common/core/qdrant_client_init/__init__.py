@@ -1,12 +1,16 @@
-from qdrant_client import QdrantClient
-from qdrant_client.http import models
+from qdrant_client import AsyncQdrantClient
 import os
+import httpx
 
-class qdrant_client:
+class QdrantClient:
     def __init__(self):
-        self.client = QdrantClient(
+        self.client = AsyncQdrantClient(
             url=os.getenv("QDRANT_CLOUD_URL"),
-            api_key=os.getenv("QDRANT_API_KEY")
+            api_key=os.getenv("QDRANT_API_KEY"),
+            limits=httpx.Limits(
+                max_connections=100, 
+                max_keepalive_connections=50 
+            )
         )
         
-qdrant_client = qdrant_client()
+qdrant_client = QdrantClient()

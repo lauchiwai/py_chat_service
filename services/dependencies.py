@@ -6,7 +6,7 @@ from common.core.mongodb_init import mongodb
 async def get_vector_service():
     return VectorService()
 
-async def get_chat_service(
+def get_chat_service(
     db = Depends(get_db),
     vector_service: VectorService = Depends(get_vector_service)
 ):
