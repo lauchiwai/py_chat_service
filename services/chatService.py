@@ -88,6 +88,7 @@ class ChatService:
         })
         
     async def save_chat_history(self, chat_history):
+        print(f"[Debug] 開始保存 Session: {chat_history.get('chat_session_id')}")
         if not chat_history:
             return
         
@@ -154,6 +155,15 @@ class ChatService:
             
             llm_task = None
             client_disconnected = False
+            def log_save_result(task):
+                try:
+                    task.result() 
+                    print(f"[Success] 保存成功: {chat_history['chat_session_id']}")
+                except asyncio.CancelledError:
+                    print(f"[Error] 保存被取消: {chat_history['chat_session_id']}")
+                except Exception as e:
+                    print(f"[Error] 保存失败: {str(e)}")
+                
             try:
                 client_disconnected = False
                 task = asyncio.current_task()
@@ -217,9 +227,16 @@ class ChatService:
 
             finally:
                 if chat_history:
+                    print(f"[Debug] 生成歷史記錄")
                     self.chat_history_append(chat_history, full_response, "assistant")
-                    await self.save_chat_history(chat_history)
-
+                    print(f"[Debug] 嘗試提交保存任務")
+                    save_task = asyncio.create_task(
+                        self.save_chat_history(chat_history)
+                    )
+                    save_task.add_done_callback(log_save_result) 
+                    
+                    print(f"[Debug] 已提交保存任務: {save_task.get_name()}")
+                    
         return StreamingResponse(
             event_stream(),
             media_type="text/event-stream",
