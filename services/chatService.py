@@ -1,17 +1,16 @@
 from datetime import datetime
 from services.vectorService import VectorService
-from typing import Optional, List, AsyncGenerator
+from typing import Optional
 from fastapi.responses import StreamingResponse
+from functools import partial
 
 from common.core.llm_init.prompt import PromptTemplates
 from common.core.llm_init import deepseek
 from common.models.dto.resultdto import ResultDTO
-from common.core.llm_init.modal_config import ChatRequest
 from common.models.dto.request import VectorSearchRequest
-from common.models.dto.response import VectorSearchResult
 
-import json
-import asyncio
+import json, asyncio
+
 class ChatService:
     def __init__(self, db, vector_service: VectorService):
         self.db = db
@@ -88,32 +87,17 @@ class ChatService:
         })
         
     async def save_chat_history(self, chat_history):
-        print(f"[Debug] 開始保存 Session: {chat_history.get('chat_session_id')}")
         if not chat_history:
             return
         
-        retries = 3 
-        for attempt in range(retries):
-            try:
-                if chat_history.get("_id"):
-                    result = await self.db.histories.replace_one(
-                        {"_id": chat_history["_id"]},
-                        chat_history,
-                        upsert=True  
-                    )
-                else:
-                    result = await self.db.histories.insert_one(chat_history)
-                
-                if result.acknowledged:
-                    print(f"Chat history saved for session: {chat_history['chat_session_id']}")
-                    return
-                else:
-                    raise Exception("Database write not acknowledged")
-                    
-            except Exception as e:
-                if attempt == retries - 1:
-                    print(f"Failed to save chat history after {retries} attempts: {str(e)}")
-                await asyncio.sleep(0.5 * (attempt + 1))
+        if "_id" in chat_history:
+            await self.db.histories.replace_one(
+                {"_id": chat_history["_id"]},
+                chat_history,
+                upsert=True 
+            )
+        else:
+            await self.db.histories.insert_one(chat_history)
         
     async def vector_semantic_search(self, request):
         return await self.vector_service.vector_semantic_search(
@@ -147,26 +131,79 @@ class ChatService:
         except asyncio.TimeoutError:
             print("Deepseek request timed out")
             raise
+        
+    async def prepare_conversation_context(self, request, chat_history):
+        if not request.collection_name:
+            return chat_history["messages"]
+        
+        search_result = await self.vector_semantic_search(request)
+        
+        return self.generate_enhanced_messages_by_vector_search(
+            search_result, 
+            chat_history
+        )
+        
+    async def handle_llm_stream(self, enhanced_messages, task, client_disconnected):
+        buffer = ""
+        llm_task = None
+        
+        try:
+            llm_task = asyncio.create_task(
+                self.llm_deepseek_steam_endpoint(
+                    enhanced_messages,
+                    stream=True,
+                    timeout=30
+                )
+            )
+            stream = await llm_task
+            
+            async for chunk in stream:
+                if task.done() or client_disconnected[0]:
+                    break
+                    
+                if not chunk.choices:
+                    continue
+                    
+                content = chunk.choices[0].delta.content
+                if content:
+                    buffer += content
+                    try:
+                        data = await asyncio.to_thread(json.dumps, {"content": buffer})
+                        yield f"data: {data}\n\n", buffer
+                        buffer = ""
+                    except Exception as e:
+                        client_disconnected[0] = True
+                        raise e
+
+            if buffer:
+                data = await asyncio.to_thread(json.dumps, {"content": buffer})
+                yield f"data: {data}\n\n", buffer
+
+        finally:
+            if llm_task and not llm_task.done():
+                llm_task.cancel()
+                try:
+                    await llm_task
+                except asyncio.CancelledError:
+                    pass
+            
+    def log_save_result(self, task, chat_history):
+        try:
+            task.result() 
+            print(f"[Success] 保存成功: {chat_history['chat_session_id']}")
+        except asyncio.CancelledError:
+            print(f"[Error] 保存取消: {chat_history['chat_session_id']}")
+        except Exception as e:
+            print(f"[Error] 保存失敗: {str(e)}")
     
     async def chat_stream_endpoint(self, request):
         async def event_stream():
             chat_history = None
             full_response = ""
-            
-            llm_task = None
-            client_disconnected = False
-            def log_save_result(task):
-                try:
-                    task.result() 
-                    print(f"[Success] 保存成功: {chat_history['chat_session_id']}")
-                except asyncio.CancelledError:
-                    print(f"[Error] 保存被取消: {chat_history['chat_session_id']}")
-                except Exception as e:
-                    print(f"[Error] 保存失败: {str(e)}")
-                
+            client_disconnected = [False]
+
             try:
-                client_disconnected = False
-                task = asyncio.current_task()
+                client_disconnected[0] = False
                 
                 chat_history = await self.db.histories.find_one({"chat_session_id": request.chat_session_id})
                 if not chat_history:
@@ -174,51 +211,28 @@ class ChatService:
                 else:
                     self.chat_history_append(chat_history, request.message, "user")
 
-                enhanced_messages = []
-                if request.collection_name:
-                    search_result = await self.vector_semantic_search(request)
-                    if search_result.code != 200:
-                        yield f"event: error\ndata: {json.dumps({'message': search_result.message})}\n\n"
-                        yield "event: end\ndata: {}\n\n"
-                        return
-                    enhanced_messages = self.generate_enhanced_messages_by_vector_search(search_result, chat_history)
-                else:
-                    enhanced_messages = chat_history["messages"]
+                try:
+                    enhanced_messages = await self.prepare_conversation_context(
+                        request, chat_history
+                    )
+                except Exception as e:
+                    yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+                    yield "event: end\ndata: {}\n\n"
+                    return
 
-                buffer = ""   
-                llm_task = asyncio.create_task(self.llm_deepseek_steam_endpoint(enhanced_messages, stream=True, timeout=30))
-                stream = await llm_task
-                async for chunk in stream:
-                    if task.done() or client_disconnected:
-                        break
-                    
-                    if not chunk.choices:
-                        continue
-                        
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        full_response += content
-                        buffer += content
-                        try:
-                            data = await asyncio.to_thread(json.dumps, {"content": buffer})
-                            yield f"data: {data}\n\n"
-                            buffer = ""
-                        except Exception as e:
-                            client_disconnected = True
-                            print(f"Client disconnected: {e}")
-                            break
-                        
+                async for data_chunk, content in self.handle_llm_stream(
+                    enhanced_messages=enhanced_messages,
+                    task=asyncio.current_task(),
+                    client_disconnected=client_disconnected
+                ):
+                    full_response += content
+                    yield data_chunk
+                            
                 yield "event: end\ndata: {}\n\n"
                 
             except asyncio.CancelledError:
                 print("Streaming request cancelled")
-                client_disconnected = True
-                if llm_task and not llm_task.done():
-                    llm_task.cancel()  
-                    try:
-                        await llm_task
-                    except asyncio.CancelledError:
-                        pass
+                client_disconnected[0] = True 
             
             except Exception as e:
                 error_msg = str(e)
@@ -227,15 +241,11 @@ class ChatService:
 
             finally:
                 if chat_history:
-                    print(f"[Debug] 生成歷史記錄")
                     self.chat_history_append(chat_history, full_response, "assistant")
-                    print(f"[Debug] 嘗試提交保存任務")
-                    save_task = asyncio.create_task(
-                        self.save_chat_history(chat_history)
+                    save_task = asyncio.create_task(self.save_chat_history(chat_history))
+                    save_task.add_done_callback(
+                        partial(self.log_save_result, chat_history=chat_history)
                     )
-                    save_task.add_done_callback(log_save_result) 
-                    
-                    print(f"[Debug] 已提交保存任務: {save_task.get_name()}")
                     
         return StreamingResponse(
             event_stream(),

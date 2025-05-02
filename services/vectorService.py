@@ -28,7 +28,7 @@ class VectorService:
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
         
-    def _expand_query(self, query: str) -> str:
+    def expand_query(self, query: str) -> str:
         synonym_map: Dict[str, List[str]] = {
             "資產": ["資產", "土地", "非自住物業", "現金", "銀行儲蓄", "股票及股份的投資"]
         }
@@ -40,18 +40,18 @@ class VectorService:
         
         return " ".join(list(set(expanded_terms)))
     
-    def _encode_text(self, text: str):
+    def encode_text(self, text: str):
         return embedding.model.encode(text).tolist()
 
-    async def _enhance_encoding(self, text: str) -> List[float]:
+    async def enhance_encoding(self, text: str) -> List[float]:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             self.thread_pool,
-            self._encode_text,  
+            self.encode_text,  
             text
         )
     
-    async def _hybrid_search(self, collection: str, vector: List[float], query: str, limit: int) -> List:
+    async def hybrid_search(self, collection: str, vector: List[float], query: str, limit: int) -> List:
         keyword_filter = Filter(
             must=[FieldCondition(key="text", match=MatchText(text=query))]
         )
@@ -64,7 +64,7 @@ class VectorService:
             score_threshold=0.5
         )
         
-    def _format_result_text(self, point_id: int, original_text: str, max_length: int = 300) -> str:
+    def format_result_text(self, point_id: int, original_text: str, max_length: int = 300) -> str:
         prefix = f"[相關資料 {point_id}] "
         available_length = max_length - len(prefix)
         return f"{prefix}{original_text[:available_length]}" 
@@ -78,11 +78,11 @@ class VectorService:
             HARDCODE_LIMIT = 5
             HARDCODE_MIN_SCORE = 0.5
             
-            expanded_query = self._expand_query(request.query_text)
+            expanded_query = self.expand_query(request.query_text)
             
-            query_vector = await self._enhance_encoding(expanded_query)
+            query_vector = await self.enhance_encoding(expanded_query)
             
-            hits = await self._hybrid_search(
+            hits = await self.hybrid_search(
                 collection=request.collection_name,
                 vector=query_vector,
                 query=expanded_query,  
@@ -96,7 +96,7 @@ class VectorService:
                 if 'text' not in hit.payload:
                     continue 
                 
-                formatted_text = self._format_result_text(
+                formatted_text = self.format_result_text(
                     point_id=hit.id,
                     original_text=hit.payload["text"]
                 )
