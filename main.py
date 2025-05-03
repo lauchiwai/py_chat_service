@@ -10,11 +10,10 @@ import os, asyncio, uvicorn, logging
 from typing import AsyncGenerator, Any
 
 # import custom modules
-from controllers import vectorController, chatController
+from controllers import vectorController, chatController, articleController
 from common.core.mongodb_init import mongodb
 from common.core.llm_init import deepseek
 from common.models.dto.resultdto import ResultDTO
-from services.dependencies import get_chat_service_async
 from services.messaging.consumer import RabbitMQConsumer
 
 logging.basicConfig(
@@ -55,10 +54,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[AppState, Any]:
         logger.info("LLM initialized")
         
         logger.info("Starting RabbitMQ consumer thread...")
-        chat_service = await get_chat_service_async()
-        consumer = RabbitMQConsumer(chat_service=chat_service) 
+        consumer = RabbitMQConsumer()
+        await consumer.initialize()
         await consumer.connect()  
-
         state.consumer_task = asyncio.create_task(consumer.start_consuming())
         
         yield dict(state)
@@ -107,6 +105,7 @@ app.openapi = custom_openapi
 origins = [
     "https://api.oniind244.online/",
     "http://localhost:11115",
+    "http://localhost:11119"
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -119,6 +118,7 @@ app.add_middleware(
 
 app.include_router(vectorController.router)
 app.include_router(chatController.router)
+app.include_router(articleController.router)
 
 # start function
 if __name__ == "__main__":

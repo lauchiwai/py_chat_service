@@ -1,10 +1,13 @@
 from fastapi import Depends
 from common.dependencies import get_db
-from .vectorService import VectorService
-from common.core.mongodb_init import mongodb 
+from services.vectorService import VectorService
+from services.articleService import ArticleService
 
-async def get_vector_service():
+def get_vector_service():
     return VectorService()
+
+def get_article_service():
+    return ArticleService()
 
 def get_chat_service(
     db = Depends(get_db),

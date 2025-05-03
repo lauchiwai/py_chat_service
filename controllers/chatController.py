@@ -2,10 +2,9 @@ from services.chatService import ChatService
 from services.dependencies import get_chat_service
 
 from common.core.auth import get_current_user
-from common.core.llm_init.modal_config import ChatRequest
+from common.models.request.chatRequest import ChatRequest, SummaryRequest
 
-from fastapi import APIRouter, HTTPException, Depends, Security, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, Security
 
 router = APIRouter(prefix="/Chat", tags=["Chat Management"])
 @router.get("/getChatHistoryBySessionId/{chat_session_id}")
@@ -41,3 +40,11 @@ async def chat_stream(
     user_payload: dict = Security(get_current_user, scopes=["authenticated"])
 ):
     return await service.chat_stream_endpoint(request)
+
+@router.post("/summary_stream")
+async def summary_stream(
+    request: SummaryRequest,
+    service: ChatService = Depends(get_chat_service),
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"])
+):
+    return await service.summary_stream_endpoint(request)

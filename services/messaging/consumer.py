@@ -1,28 +1,37 @@
-import os
-import json
-import asyncio
-import logging
+import os, json, asyncio, aio_pika
 from typing import Optional
+from tenacity import stop_after_attempt, wait_exponential, retry_if_exception_type, AsyncRetrying
+from functools import partial
 
-import aio_pika 
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, AsyncRetrying
-from common.models.dto.resultdto import ResultDTO
 from services.chatService import ChatService
-from dotenv import load_dotenv
-
-load_dotenv()
-
-logging.basicConfig(level=logging.INFO)
+from services.vectorService import VectorService
+from services.articleService import ArticleService
+from services.dependencies import get_chat_service_async, get_vector_service, get_article_service
 
 class RabbitMQConsumer:
-    def __init__(self, chat_service: ChatService):
-        self.chat_service = chat_service
-        self.connection: Optional[aio_pika.RobustConnection] = None
-        self.channel: Optional[aio_pika.Channel] = None
-        self._shutdown_flag = asyncio.Event()  
+    def __init__(self):
+        self.chat_service: Optional[ChatService] = None
+        self.vector_service: Optional[VectorService] = None
+        self.article_service: Optional[ArticleService] = None
+        self.connection = None
+        self.channel = None
+        self._shutdown_flag = asyncio.Event()
+        self._event_configs = {
+            "ChatSessionDeleted": {
+                "exchange_name": "chat_events",
+                "routing_key": "chat.deleted",
+                "queue_name": "chat_deleted_queue",
+                "dl_exchange": "chat_dlx",
+                "dl_routing_key": "chat.dead"
+            },
+        }
 
+    async def initialize(self):
+        self.chat_service = await get_chat_service_async() 
+        self.vector_service = get_vector_service() 
+        self.article_service = get_article_service() 
+        
     async def connect(self):
-        """Initialize RabbitMQ connection"""
         try:
             self.connection = await aio_pika.connect_robust(
                 host=os.getenv("RBMQ_HOSTNAME"),
@@ -32,109 +41,109 @@ class RabbitMQConsumer:
             )
             self.channel = await self.connection.channel()
             await self.channel.set_qos(prefetch_count=10)
-            await self._declare_infrastructure()
+            await self.declare_infrastructure()
         except Exception as e:
-            logging.error(f"Failed to connect to RabbitMQ: {str(e)}")
-            await self._safe_close()
+            print(f"Connection failed: {str(e)}")
+            await self.safe_close()
             raise
 
-    async def _declare_infrastructure(self):
+    async def declare_infrastructure(self):
         try:
-            exchange = await self.channel.declare_exchange(
-                name="chat_events",
-                type=aio_pika.ExchangeType.DIRECT,
-                durable=True
-            )
-            
-            dlx_exchange = await self.channel.declare_exchange(
-                name="chat_dlx",
-                type=aio_pika.ExchangeType.DIRECT,
-                durable=True
-            )
-            
-            queue = await self.channel.declare_queue(
-                name="chat_deleted_queue",
-                durable=True,
-                arguments={
-                    "x-dead-letter-exchange": "chat_dlx",
-                    "x-dead-letter-routing-key": "chat.dead"
-                }
-            )
-            await queue.bind(exchange, routing_key="chat.deleted")
-            
-            dlx_queue = await self.channel.declare_queue(
-                name="chat_dead_letter_queue",
-                durable=True
-            )
-            await dlx_queue.bind(dlx_exchange, routing_key="chat.dead")
-            
-        except aio_pika.exceptions.ChannelClosed as e:
-            logging.error(f"Failed to declare RabbitMQ resources: {str(e)}")
-            await self._safe_close()
-            raise
+            exchanges = set()
+            for cfg in self._event_configs.values():
+                exchanges.add(cfg["exchange_name"])
+                exchanges.add(cfg["dl_exchange"])
 
-    async def _on_message(self, message: aio_pika.IncomingMessage):
-        """Asynchronous message processing"""
-        async with message.process(ignore_processed=True):  
-            try:
-                data = json.loads(message.body.decode())
-                session_id = data.get("session_id") or data.get("sessionId") or data.get("SessionId")
-                
-                if not session_id:
-                    logging.error("Message missing session_id")
-                    await message.reject(requeue=False)  
-                    return
-                
-                # Async retry logic
-                async for attempt in AsyncRetrying(
-                    stop=stop_after_attempt(3),
-                    wait=wait_exponential(multiplier=1, min=2, max=10),
-                    retry=retry_if_exception_type(Exception)
-                ):
-                    with attempt:
-                        result = await self._process_deletion(session_id)
-                        
-                        if result.success:
-                            logging.info(f"Session deleted successfully: {session_id}")
-                        else:
-                            logging.error(f"Deletion failed: {result.message}")
-                            raise RuntimeError(result.message) 
-                            
-            except Exception as e:
-                logging.error(f"Error processing message: {str(e)}", exc_info=True)
-                await message.reject(requeue=False) 
+            for exchange in exchanges:
+                await self.channel.declare_exchange(
+                    name=exchange,
+                    type=aio_pika.ExchangeType.DIRECT,
+                    durable=True
+                )
+                print(f"Declared exchange: {exchange}")
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _process_deletion(self, session_id: str) -> ResultDTO:
-        """Business logic with retry"""
-        try:
-            return await self.chat_service.delete_chat_history_by_session_id(session_id)
+            for config in self._event_configs.values():
+                queue = await self.channel.declare_queue(
+                    name=config["queue_name"],
+                    durable=True,
+                    arguments={
+                        "x-dead-letter-exchange": config["dl_exchange"],
+                        "x-dead-letter-routing-key": config["dl_routing_key"]
+                    }
+                )
+                await queue.bind(config["exchange_name"], config["routing_key"])
+                print(f"Bound queue {config['queue_name']} to {config['exchange_name']}")
+
+                dlx_queue = await self.channel.declare_queue(
+                    name=f"{config['dl_exchange']}_queue",
+                    durable=True
+                )
+                await dlx_queue.bind(config["dl_exchange"], config["dl_routing_key"])
+
         except Exception as e:
-            logging.error(f"Service layer error: {str(e)}")
-            return ResultDTO.fail(code=500, message="Internal server error")
+            print(f"Infrastructure setup failed: {str(e)}")
+            await self.safe_close()
+            raise
 
     async def start_consuming(self):
-        """Start async consumer"""
-        queue = await self.channel.get_queue("chat_deleted_queue")
-        await queue.consume(self._on_message)
-        logging.info("Consumer started successfully")
-        
-        # Keep running until shutdown
-        await self._shutdown_flag.wait()
-        await self._safe_close()
+        try:
+            for config_name, config in self._event_configs.items():
+                queue = await self.channel.get_queue(config["queue_name"])
+                callback = partial(self.on_message, config_name=config_name, queue_name=config["queue_name"])
+                await queue.consume(callback)
+                print(f"Listening to queue: {config['queue_name']}")
+            
+            await self._shutdown_flag.wait()
+        except Exception as e:
+            print(f"Consuming failed: {str(e)}")
+            await self.safe_close()
 
-    async def _safe_close(self):
-        """Safely close connections"""
+    async def on_message(self, message: aio_pika.IncomingMessage, config_name: str, queue_name: str):
+        async with message.process(requeue=False):  
+            try:
+                config = self._event_configs.get(config_name)
+                if not config:
+                    print(f"Config {config_name} not found for queue: {queue_name}")
+                    raise ValueError(f"Config {config_name} not found")
+
+                if config_name == "ChatSessionDeleted":
+                    await self.handle_chat_deletion(message)
+                else:
+                    print(f"Unhandled event type: {config_name}")
+                    raise ValueError(f"Unhandled event type: {config_name}")
+
+            except Exception as e:
+                print(f"Message processing error: {str(e)}")
+                
+    async def handle_chat_deletion(self, message: aio_pika.IncomingMessage):
+        data = json.loads(message.body.decode())
+        session_id = data.get("SessionId")
+        
+        if not session_id:
+            print("Missing session_id in message")
+            raise ValueError("Missing session_id in message")
+
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            retry=retry_if_exception_type(Exception)
+        ):
+            with attempt:
+                result = await self.chat_service.delete_chat_history_by_session_id(session_id)
+                if not result.success:
+                    raise RuntimeError(result.message)
+                print(f"Deleted chat session: {session_id}")
+
+    async def safe_close(self):
         try:
             if self.channel and not self.channel.is_closed:
                 await self.channel.close()
             if self.connection and not self.connection.is_closed:
                 await self.connection.close()
-            logging.info("RabbitMQ connection closed safely")
+            print("Connection closed")
         except Exception as e:
-            logging.warning(f"Error closing connection: {str(e)}")
+            print(f"Close error: {str(e)}")
 
     async def graceful_shutdown(self):
-        """Graceful shutdown entrypoint"""
         self._shutdown_flag.set()
-        logging.info("Shutdown signal received, stopping consumer...")
+        print("Shutting down consumer...")

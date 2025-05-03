@@ -6,4 +6,3 @@ class CollectionInfo(BaseModel):
 class VectorSearchResult(BaseModel):
     text: str
     score: float
-    

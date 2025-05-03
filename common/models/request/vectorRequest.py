@@ -1,22 +1,23 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
-
-class ChatRequest(BaseModel):
-    collection_name: str 
-    chat_session_id: str
-    user_id: str
     
 class GenerateCollectionRequest(BaseModel):
     collection_name: str
 
 class TextPoint(BaseModel):
     text: str
-    id: Optional[int] = None
+    id: Optional[int] = Field(None, gt=0)
     
 class UpsertCollectionRequest(BaseModel):
     collection_name: str
+    id: str
     points: List[TextPoint]
     
 class VectorSearchRequest(BaseModel):
     collection_name: str
     query_text: str
+    id: str
+    
+class CheckVectorDataExistRequest(BaseModel):
+    collection_name: str
+    id: str
