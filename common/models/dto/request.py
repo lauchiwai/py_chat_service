@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class ChatRequest(BaseModel):
@@ -11,10 +11,11 @@ class GenerateCollectionRequest(BaseModel):
 
 class TextPoint(BaseModel):
     text: str
-    id: Optional[int] = None
+    id: Optional[int] = Field(None, gt=0)
     
 class UpsertCollectionRequest(BaseModel):
     collection_name: str
+    article_id: str
     points: List[TextPoint]
     
 class VectorSearchRequest(BaseModel):

@@ -1,11 +1,12 @@
-import asyncio, os
-from concurrent.futures import ThreadPoolExecutor
 from common.models.dto.resultdto import ResultDTO
 from common.models.dto.response import CollectionInfo, VectorSearchResult
 from common.models.dto.request import GenerateCollectionRequest, VectorSearchRequest, UpsertCollectionRequest
 from common.core.qdrant_client_init import qdrant_client
 from common.core.embedding_init import embedding
-from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchText
+
+import asyncio, os, hashlib
+from concurrent.futures import ThreadPoolExecutor
+from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchText, MatchValue
 from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 
@@ -108,35 +109,54 @@ class VectorService:
             return ResultDTO.ok(data=filtered_results[:HARDCODE_LIMIT])
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
-        
+     
+    def generate_article_base_id(self, article_id: str) -> int:
+        """ string article_id switch int"""
+        try:
+            return int(article_id)
+        except ValueError:
+            hash_obj = hashlib.sha256(article_id.encode())
+            return int(hash_obj.hexdigest()[:8], 16)
+           
     async def upsert_texts(self, request: UpsertCollectionRequest) -> ResultDTO:
-        """upsert texts"""
+        """upsert texts with article-level ID"""
         if not await qdrant_client.client.collection_exists(request.collection_name):
             return ResultDTO.fail(code=404, message="Collection not found")
         
         try:
+            base_id = self.generate_article_base_id(request.article_id)
+            
+            point_ids = [base_id + idx for idx in range(len(request.points))]
+            
             texts = [p.text for p in request.points]
             loop = asyncio.get_running_loop()
             vectors = await loop.run_in_executor(
                 self.thread_pool,
                 lambda: embedding.model.encode(texts).tolist()
             )
-            request.points = [
+
+            points = [
                 PointStruct(
-                    id=p.id or idx,
+                    id=point_id,
                     vector=vector,
-                    payload={"text": p.text}
+                    payload={
+                        "text": p.text,
+                        "article_id": request.article_id,
+                        "point_index": idx
+                    }
                 )
-                for idx, (p, vector) in enumerate(zip(request.points, vectors))
+                for idx, (p, vector, point_id) in enumerate(zip(request.points, vectors, point_ids))
             ]
-            
+
             await qdrant_client.client.upsert(
                 collection_name=request.collection_name,
-                points=request.points
+                points=points
             )
-            return ResultDTO.ok(message=f"Successfully inserted {len(request.points)} data")
+            
+            return ResultDTO.ok(message=f"Inserted {len(points)} points under article {request.article_id}")
+            
         except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
+            return ResultDTO.fail(code=500, message=f"Upsert failed: {str(e)}")
             
     async def generate_collection(self,request: GenerateCollectionRequest) -> ResultDTO:
         """generate collections"""
