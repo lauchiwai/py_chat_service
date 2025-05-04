@@ -21,3 +21,4 @@ class UpsertCollectionRequest(BaseModel):
 class VectorSearchRequest(BaseModel):
     collection_name: str
     query_text: str
+    article_id: str

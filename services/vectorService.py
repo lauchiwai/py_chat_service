@@ -1,13 +1,13 @@
 from common.models.dto.resultdto import ResultDTO
 from common.models.dto.response import CollectionInfo, VectorSearchResult
-from common.models.dto.request import GenerateCollectionRequest, VectorSearchRequest, UpsertCollectionRequest
+from common.models.dto.request import GenerateCollectionRequest, UpsertCollectionRequest
 from common.core.qdrant_client_init import qdrant_client
 from common.core.embedding_init import embedding
 
 import asyncio, os, hashlib
 from concurrent.futures import ThreadPoolExecutor
 from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchText, MatchValue
-from typing import List, Dict
+from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 max_workers = min(32, (os.cpu_count() or 4) + 4) 
@@ -15,6 +15,8 @@ embedding_executor = ThreadPoolExecutor(max_workers=max_workers)
 class VectorService:
     def __init__(self):
         self.thread_pool = embedding_executor 
+        self.HARDCODE_LIMIT = 5
+        self.HARDCODE_MIN_SCORE = 0.5
         
     async def close(self):
         """close thread pool"""
@@ -28,90 +30,9 @@ class VectorService:
             return ResultDTO.ok(data=converted)
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
-        
-    def expand_query(self, query: str) -> str:
-        synonym_map: Dict[str, List[str]] = {
-            "資產": ["資產", "土地", "非自住物業", "現金", "銀行儲蓄", "股票及股份的投資"]
-        }
-        
-        expanded_terms = [query]
-        for term, synonyms in synonym_map.items():
-            if term in query:
-                expanded_terms.extend(synonyms)
-        
-        return " ".join(list(set(expanded_terms)))
-    
-    def encode_text(self, text: str):
-        return embedding.model.encode(text).tolist()
-
-    async def enhance_encoding(self, text: str) -> List[float]:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            self.thread_pool,
-            self.encode_text,  
-            text
-        )
-    
-    async def hybrid_search(self, collection: str, vector: List[float], query: str, limit: int) -> List:
-        keyword_filter = Filter(
-            must=[FieldCondition(key="text", match=MatchText(text=query))]
-        )
-        
-        return await qdrant_client.client.search(
-            collection_name=collection,
-            query_vector=vector,
-            query_filter=keyword_filter,  
-            limit=limit * 2,  
-            score_threshold=0.5
-        )
-        
-    def format_result_text(self, point_id: int, original_text: str, max_length: int = 300) -> str:
-        prefix = f"[相關資料 {point_id}] "
-        available_length = max_length - len(prefix)
-        return f"{prefix}{original_text[:available_length]}" 
-        
-    async def vector_semantic_search(self, request: VectorSearchRequest) -> ResultDTO[List[VectorSearchResult]]:
-        """vector semantic search"""
-        try:
-            if not await qdrant_client.client.collection_exists(request.collection_name):
-                return ResultDTO.fail(code=404, message="Collection not found")
-            
-            HARDCODE_LIMIT = 5
-            HARDCODE_MIN_SCORE = 0.5
-            
-            expanded_query = self.expand_query(request.query_text)
-            
-            query_vector = await self.enhance_encoding(expanded_query)
-            
-            hits = await self.hybrid_search(
-                collection=request.collection_name,
-                vector=query_vector,
-                query=expanded_query,  
-                limit=HARDCODE_LIMIT
-            )
-
-            filtered_results = []
-            for hit in hits:
-                if hit.score < HARDCODE_MIN_SCORE:
-                    continue
-                if 'text' not in hit.payload:
-                    continue 
-                
-                formatted_text = self.format_result_text(
-                    point_id=hit.id,
-                    original_text=hit.payload["text"]
-                )
-                
-                filtered_results.append(
-                    VectorSearchResult(text=formatted_text, score=hit.score)
-                )
-
-            return ResultDTO.ok(data=filtered_results[:HARDCODE_LIMIT])
-        except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
      
-    def generate_article_base_id(self, article_id: str) -> int:
-        """ string article_id switch int"""
+    def generate_base_id(self, article_id: str) -> int:
+        """ string base id switch int"""
         try:
             return int(article_id)
         except ValueError:
@@ -119,12 +40,12 @@ class VectorService:
             return int(hash_obj.hexdigest()[:8], 16)
            
     async def upsert_texts(self, request: UpsertCollectionRequest) -> ResultDTO:
-        """upsert texts with article-level ID"""
+        """upsert texts"""
         if not await qdrant_client.client.collection_exists(request.collection_name):
             return ResultDTO.fail(code=404, message="Collection not found")
         
         try:
-            base_id = self.generate_article_base_id(request.article_id)
+            base_id = self.generate_base_id(request.article_id)
             
             point_ids = [base_id + idx for idx in range(len(request.points))]
             
@@ -176,3 +97,155 @@ class VectorService:
             return ResultDTO.ok(message=f"Collection {request.collection_name} create Successful")
         except Exception as e:
             return ResultDTO.fail(code=400, message=str(e))
+        
+    def expand_query(self, query: str) -> str:
+        """expand query"""
+        synonym_map: Dict[str, List[str]] = {
+            "邊個": ["誰"],
+            "幾時": ["什么時候"],
+        }
+        
+        expanded_terms = [query]
+        for term, synonyms in synonym_map.items():
+            if term in query:
+                expanded_terms.extend(synonyms)
+        
+        return " ".join(list(set(expanded_terms)))
+
+    async def check_collection_exists(self, collection_name: str) -> Optional[ResultDTO]:
+        """check collection exists"""
+        if not await qdrant_client.client.collection_exists(collection_name):
+            return ResultDTO.fail(code=404, message="Collection not found")
+        return None
+
+    def build_search_filter(self, article_id: str, query_text: str = None) -> Filter:
+        """build search filter"""
+        must_conditions = [
+            FieldCondition(
+                key="article_id",
+                match=MatchValue(value=article_id)
+            )
+        ]
+        
+        if query_text:
+            must_conditions.append(
+                FieldCondition(key="text", match=MatchText(text=query_text))
+            )
+        
+        return Filter(must=must_conditions)
+    
+    def format_result_text(self, point_id: int, original_text: str, max_length: int = 300) -> str:
+        prefix = f"[Related Data {point_id}] "
+        available_length = max_length - len(prefix)
+        return f"{prefix}{original_text[:available_length]}" 
+
+    def process_record(self, record, default_score: float = 1.0) -> Optional[VectorSearchResult]:
+        """process record"""
+        try:
+            text = record.payload.get("text", "")
+            if not text.strip():
+                return None
+            
+            return VectorSearchResult(
+                text=self.format_result_text(
+                    point_id=record.id,
+                    original_text=text
+                ),
+                score=getattr(record, "score", default_score)
+            )
+        except Exception as e:
+            print(f"Skipping invalid record: {str(e)}")
+            return None
+        
+    def encode_text(self, text: str):
+        return embedding.model.encode(text).tolist()
+    
+    async def enhance_encoding(self, text: str) -> List[float]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self.thread_pool,
+            self.encode_text,  
+            text
+        )
+
+    async def scroll_all_records(self, collection_name: str, search_filter: Filter) -> List:
+        """scroll all records"""
+        all_records = []
+        next_offset = None
+        
+        while True:
+            response = await qdrant_client.client.scroll(
+                collection_name=collection_name,
+                scroll_filter=search_filter,
+                limit=500,
+                offset=next_offset,
+                with_payload=True
+            )
+            
+            records, next_offset = response
+            if not records:
+                break
+                
+            all_records.extend(records)
+            if next_offset is None:
+                break
+        
+        return all_records
+
+    async def vector_semantic_search(self, collection_name: str, query_text: str, article_id: str) -> ResultDTO[List[VectorSearchResult]]:
+        """vector semantic search"""
+        try:
+            if error := await self.check_collection_exists(collection_name):
+                return error
+            
+            search_filter = self.build_search_filter(
+                article_id=article_id,
+                query_text=self.expand_query(query_text)
+            )
+            
+            query_vector = await self.enhance_encoding(
+                self.expand_query(query_text))
+            
+            hits = await qdrant_client.client.search(
+                collection_name=collection_name,
+                query_vector=query_vector,
+                query_filter=search_filter,
+                limit=self.HARDCODE_LIMIT * 2,
+                score_threshold=0.5
+            )
+
+            filtered_results = []
+            for hit in hits:
+                if hit.score < self.HARDCODE_MIN_SCORE:
+                    continue
+                
+                if result := self.process_record(hit):
+                    filtered_results.append(result)
+            
+            return ResultDTO.ok(data=filtered_results[:self.HARDCODE_LIMIT])
+        
+        except Exception as e:
+            return ResultDTO.fail(code=400, message=str(e))
+
+    async def vector_article_all_text_query(self, collection_name: str, article_id: str) -> ResultDTO[List[VectorSearchResult]]:
+        """vector article all text query"""
+        try:
+            if error := await self.check_collection_exists(collection_name):
+                return error
+            
+            search_filter = self.build_search_filter(article_id=article_id)
+            
+            all_records = await self.scroll_all_records(
+                collection_name=collection_name,
+                search_filter=search_filter
+            )
+            
+            results = []
+            for record in all_records:
+                if result := self.process_record(record, default_score=1.0):
+                    results.append(result)
+            
+            return ResultDTO.ok(data=results)
+        
+        except Exception as e:
+            return ResultDTO.fail(code=500, message="Internal server error")
