@@ -6,7 +6,7 @@ from common.core.embedding_init import embedding
 
 import asyncio, os, hashlib
 from concurrent.futures import ThreadPoolExecutor
-from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchText, MatchValue
+from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchValue
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
 
@@ -16,7 +16,7 @@ class VectorService:
     def __init__(self):
         self.thread_pool = embedding_executor 
         self.HARDCODE_LIMIT = 5
-        self.HARDCODE_MIN_SCORE = 0.5
+        self.HARDCODE_MIN_SCORE = 0.4
         
     async def close(self):
         """close thread pool"""
@@ -85,7 +85,7 @@ class VectorService:
             if await qdrant_client.client.collection_exists(request.collection_name):
                 return ResultDTO.fail(code=400, message="Collection already exists")
             
-            vector_size: int = 384
+            vector_size: int = 768
             distance: str = "COSINE"
             await qdrant_client.client.create_collection(
                 collection_name=request.collection_name,
@@ -118,7 +118,7 @@ class VectorService:
             return ResultDTO.fail(code=404, message="Collection not found")
         return None
 
-    def build_search_filter(self, article_id: str, query_text: str = None) -> Filter:
+    def build_search_filter(self, article_id: str) -> Filter:
         """build search filter"""
         must_conditions = [
             FieldCondition(
@@ -126,11 +126,6 @@ class VectorService:
                 match=MatchValue(value=article_id)
             )
         ]
-        
-        if query_text:
-            must_conditions.append(
-                FieldCondition(key="text", match=MatchText(text=query_text))
-            )
         
         return Filter(must=must_conditions)
     
@@ -198,22 +193,22 @@ class VectorService:
             if error := await self.check_collection_exists(collection_name):
                 return error
             
-            search_filter = self.build_search_filter(
-                article_id=article_id,
-                query_text=self.expand_query(query_text)
-            )
+            search_filter = self.build_search_filter(article_id=article_id)
             
-            query_vector = await self.enhance_encoding(
-                self.expand_query(query_text))
+            print("search_filter: ", search_filter)
             
+            query_vector = await self.enhance_encoding(self.expand_query(query_text))
+            
+            print("query_vector: ", query_vector)
             hits = await qdrant_client.client.search(
                 collection_name=collection_name,
                 query_vector=query_vector,
                 query_filter=search_filter,
                 limit=self.HARDCODE_LIMIT * 2,
-                score_threshold=0.5
+                score_threshold=self.HARDCODE_MIN_SCORE
             )
-
+            
+            print("hits: ", hits)
             filtered_results = []
             for hit in hits:
                 if hit.score < self.HARDCODE_MIN_SCORE:
@@ -222,6 +217,7 @@ class VectorService:
                 if result := self.process_record(hit):
                     filtered_results.append(result)
             
+            print("filtered_results[:self.HARDCODE_LIMIT]: ", filtered_results[:self.HARDCODE_LIMIT])
             return ResultDTO.ok(data=filtered_results[:self.HARDCODE_LIMIT])
         
         except Exception as e:

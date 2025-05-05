@@ -14,7 +14,7 @@ router = APIRouter(prefix="/Vector", tags=["Vector Management"])
 @router.get("/get_collections", response_model=ResultDTO[List[CollectionInfo]])
 async def get_collections(
     service: VectorService = Depends(get_vector_service),
-    #user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ) -> ResultDTO[List[CollectionInfo]]:
     """Get all collection information"""
     result = await service.get_all_collections()
@@ -27,7 +27,7 @@ async def get_collections(
 async def vector_semantic_search(
     request: VectorSearchRequest, 
     service: VectorService = Depends(get_vector_service),
-    #user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ) -> ResultDTO[List[VectorSearchResult]]:
     """Semantic similarity search"""
     result = await service.vector_semantic_search(request)
@@ -41,7 +41,7 @@ async def vector_semantic_search(
 async def upsert_texts(
     request: UpsertCollectionRequest,
     service: VectorService = Depends(get_vector_service),
-    #user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ) -> ResultDTO:
     """Batch upsert text data"""
     result = await service.upsert_texts(request)
@@ -55,7 +55,7 @@ async def upsert_texts(
 async def generate_collection(
     request: GenerateCollectionRequest,
     service: VectorService = Depends(get_vector_service),
-    #user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ) -> ResultDTO:
     """Generate a new collection"""
     result = await service.generate_collection(request)
