@@ -10,7 +10,7 @@ import os, asyncio, uvicorn, logging
 from typing import AsyncGenerator, Any
 
 # import custom modules
-from controllers import vectorController, chatController, articleController
+from controllers import vectorController, chatController, articleController, englishAssistantController
 from core.mongodb_init import mongodb
 from core.llm_init import deepseek
 from models.dto.resultdto import ResultDTO
@@ -119,6 +119,7 @@ app.add_middleware(
 app.include_router(vectorController.router)
 app.include_router(chatController.router)
 app.include_router(articleController.router)
+app.include_router(englishAssistantController.router)
 
 # start function
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 import json
 import asyncio
-from functools import partial
 from fastapi.responses import StreamingResponse
 from core.llm_init import deepseek
 

@@ -1,8 +1,7 @@
-import asyncio, re
+import asyncio
 
 from typing import Optional
 from core.llm_init.prompt import PromptTemplates
-from models.dto.resultdto import ResultDTO
 from models.request.articleRequest import ArticleGenerationRequest
 from helper.llmStreamHelper import LLMStreamHelper
 
@@ -21,17 +20,6 @@ class ArticleService:
             temperature=self.temperature,
             max_tokens=self.max_tokens
         )
-
-    def split_article(self, content: str):
-        sections = re.split(r'\\n', content)
-        
-        cleaned_sections = [
-            section.strip() 
-            for section in sections 
-            if section.strip()
-        ]
-        
-        return ResultDTO.ok(data=cleaned_sections)
         
     async def stream_generate_article(self, request: ArticleGenerationRequest):
         async def event_stream():
