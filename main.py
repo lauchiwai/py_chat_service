@@ -11,9 +11,9 @@ from typing import AsyncGenerator, Any
 
 # import custom modules
 from controllers import vectorController, chatController, articleController
-from common.core.mongodb_init import mongodb
-from common.core.llm_init import deepseek
-from common.models.dto.resultdto import ResultDTO
+from core.mongodb_init import mongodb
+from core.llm_init import deepseek
+from models.dto.resultdto import ResultDTO
 from services.messaging.consumer import RabbitMQConsumer
 
 logging.basicConfig(

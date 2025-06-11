@@ -2,7 +2,7 @@ import json
 import asyncio
 from functools import partial
 from fastapi.responses import StreamingResponse
-from common.core.llm_init import deepseek
+from core.llm_init import deepseek
 
 class LLMStreamHelper:
     def __init__(self, prompt_templates, temperature=0.7, max_tokens=3000):

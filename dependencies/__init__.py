@@ -1,4 +1,4 @@
-from common.core.mongodb_init import mongodb
+from core.mongodb_init import mongodb
 from fastapi import HTTPException, Header, Depends
 import os
 

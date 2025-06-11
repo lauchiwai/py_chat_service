@@ -1,9 +1,9 @@
 import asyncio, re
 
 from typing import Optional
-from common.core.llm_init.prompt import PromptTemplates
-from common.models.dto.resultdto import ResultDTO
-from common.models.request.articleRequest import ArticleGenerationRequest
+from core.llm_init.prompt import PromptTemplates
+from models.dto.resultdto import ResultDTO
+from models.request.articleRequest import ArticleGenerationRequest
 from helper.llmStreamHelper import LLMStreamHelper
 
 class ArticleService:

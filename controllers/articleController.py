@@ -1,6 +1,6 @@
 from services.articleService import ArticleService
 from services.dependencies import get_article_service
-from common.models.request.articleRequest import ArticleGenerationRequest
+from models.request.articleRequest import ArticleGenerationRequest
 
 from fastapi import APIRouter, HTTPException, Depends
 

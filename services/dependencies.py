@@ -1,5 +1,5 @@
 from fastapi import Depends
-from common.dependencies import get_db
+from dependencies import get_db
 from services.vectorService import VectorService
 from services.articleService import ArticleService
 

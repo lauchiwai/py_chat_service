@@ -4,9 +4,9 @@ from helper.vectorHelper import VectorHelper
 from services.vectorService import VectorService
 from typing import Optional
 
-from common.core.llm_init.prompt import PromptTemplates
-from common.models.dto.resultdto import ResultDTO
-from common.models.request.chatRequest import ChatRequest, SummaryRequest
+from core.llm_init.prompt import PromptTemplates
+from models.dto.resultdto import ResultDTO
+from models.request.chatRequest import ChatRequest, SummaryRequest
 import asyncio
 
 class ChatService:

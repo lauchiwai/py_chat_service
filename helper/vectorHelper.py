@@ -1,4 +1,4 @@
-from common.models.request.chatRequest import ChatRequest
+from models.request.chatRequest import ChatRequest
 from services.vectorService import VectorService
 
 class VectorHelper:

@@ -2,10 +2,10 @@ from services.vectorService import VectorService
 from services.dependencies import get_vector_service
 from fastapi import APIRouter, HTTPException, Depends, Security
 
-from common.models.request.vectorRequest import CheckVectorDataExistRequest, DeleteVectorDataRequest, GenerateCollectionRequest, VectorSearchRequest, UpsertCollectionRequest
-from common.core.auth import get_current_user
-from common.models.dto.resultdto import ResultDTO
-from common.models.response.vectorResponse import CollectionInfo, VectorSearchResult
+from models.request.vectorRequest import CheckVectorDataExistRequest, DeleteVectorDataRequest, GenerateCollectionRequest, VectorSearchRequest, UpsertCollectionRequest
+from core.auth import get_current_user
+from models.dto.resultdto import ResultDTO
+from models.response.vectorResponse import CollectionInfo, VectorSearchResult
 
 from typing import List
 

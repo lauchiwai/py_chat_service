@@ -3,7 +3,7 @@ from typing import Optional
 from tenacity import stop_after_attempt, wait_exponential, retry_if_exception_type, AsyncRetrying
 from functools import partial
 
-from common.models.request.vectorRequest import DeleteVectorDataRequest
+from models.request.vectorRequest import DeleteVectorDataRequest
 from services.chatService import ChatService
 from services.vectorService import VectorService
 from services.articleService import ArticleService

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Union
-from common.models.request.chatRequest import ChatRequest, SummaryRequest
+from models.request.chatRequest import ChatRequest, SummaryRequest
 import asyncio
 from functools import partial
 

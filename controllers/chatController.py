@@ -1,8 +1,8 @@
 from services.chatService import ChatService
 from services.dependencies import get_chat_service
 
-from common.core.auth import get_current_user
-from common.models.request.chatRequest import ChatRequest, SummaryRequest
+from core.auth import get_current_user
+from models.request.chatRequest import ChatRequest, SummaryRequest
 
 from fastapi import APIRouter, HTTPException, Depends, Security
 

@@ -1,8 +1,8 @@
-from common.models.dto.resultdto import ResultDTO
-from common.models.response.vectorResponse import CollectionInfo, VectorSearchResult
-from common.models.request.vectorRequest import CheckVectorDataExistRequest, DeleteVectorDataRequest, GenerateCollectionRequest, UpsertCollectionRequest
-from common.core.qdrant_client_init import qdrant_client
-from common.core.embedding_init import embedding
+from models.dto.resultdto import ResultDTO
+from models.response.vectorResponse import CollectionInfo, VectorSearchResult
+from models.request.vectorRequest import CheckVectorDataExistRequest, DeleteVectorDataRequest, GenerateCollectionRequest, UpsertCollectionRequest
+from core.qdrant_client_init import qdrant_client
+from core.embedding_init import embedding
 
 import asyncio, os, hashlib
 from qdrant_client.http import models
