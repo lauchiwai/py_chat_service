@@ -10,14 +10,18 @@ class TextPoint(BaseModel):
     
 class UpsertCollectionRequest(BaseModel):
     collection_name: str
-    id: str
+    id: int
     points: List[TextPoint]
     
 class VectorSearchRequest(BaseModel):
     collection_name: str
     query_text: str
-    id: str
+    id: int
     
 class CheckVectorDataExistRequest(BaseModel):
     collection_name: str
-    id: str
+    id: int
+    
+class DeleteVectorDataRequest(BaseModel):
+    collection_name: str
+    id: int

@@ -3,6 +3,7 @@ from typing import Optional
 from tenacity import stop_after_attempt, wait_exponential, retry_if_exception_type, AsyncRetrying
 from functools import partial
 
+from common.models.request.vectorRequest import DeleteVectorDataRequest
 from services.chatService import ChatService
 from services.vectorService import VectorService
 from services.articleService import ArticleService
@@ -24,6 +25,13 @@ class RabbitMQConsumer:
                 "dl_exchange": "chat_dlx",
                 "dl_routing_key": "chat.dead"
             },
+            "ArticleDeleted": {
+                "exchange_name": "article_events",
+                "routing_key": "article.deleted",
+                "queue_name": "article_deleted_queue",
+                "dl_exchange": "article_dlx",
+                "dl_routing_key": "article.dead"
+            }
         }
 
     async def initialize(self):
@@ -108,12 +116,51 @@ class RabbitMQConsumer:
 
                 if config_name == "ChatSessionDeleted":
                     await self.handle_chat_deletion(message)
+                elif config_name == "ArticleDeleted":
+                    await self.handle_article_deletion(message)
                 else:
                     print(f"Unhandled event type: {config_name}")
                     raise ValueError(f"Unhandled event type: {config_name}")
 
             except Exception as e:
                 print(f"Message processing error: {str(e)}")
+    
+    async def handle_article_deletion(self, message: aio_pika.IncomingMessage):
+        data = json.loads(message.body.decode())
+        article_id = data.get("ArticleId")
+        collection_name =  data.get("CollectionName")
+        
+        if not article_id :
+            print("Missing article_id  in message")
+            raise ValueError("Missing article_id  in message")
+        
+        if not collection_name :
+            print("Missing collection_name in message")
+            raise ValueError("Missing collection_name in message")
+        
+        try:
+            article_id = int(article_id)
+        except (ValueError, TypeError):
+            raise ValueError("ArticleID must be an integer")
+
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            retry=retry_if_exception_type(Exception)
+        ):
+            with attempt:
+                delete_vector_request = DeleteVectorDataRequest(
+                    collection_name=collection_name,
+                    id=article_id
+                )
+                print(f"Processing article deletion: {delete_vector_request}")
+                
+                result = await self.vector_service.delete_vector_data(delete_vector_request)
+                
+                if not result.success:
+                    raise RuntimeError(result.message)
+                
+                print(f"Successfully processed article deletion: {article_id}")
                 
     async def handle_chat_deletion(self, message: aio_pika.IncomingMessage):
         data = json.loads(message.body.decode())

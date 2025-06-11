@@ -1,6 +1,6 @@
 from common.models.dto.resultdto import ResultDTO
 from common.models.response.vectorResponse import CollectionInfo, VectorSearchResult
-from common.models.request.vectorRequest import CheckVectorDataExistRequest, GenerateCollectionRequest, UpsertCollectionRequest
+from common.models.request.vectorRequest import CheckVectorDataExistRequest, DeleteVectorDataRequest, GenerateCollectionRequest, UpsertCollectionRequest
 from common.core.qdrant_client_init import qdrant_client
 from common.core.embedding_init import embedding
 
@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchValue
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
+from qdrant_client.http import models as qdrant_models
 
 max_workers = min(32, (os.cpu_count() or 4) + 4) 
 embedding_executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -30,7 +31,33 @@ class VectorService:
             converted = [CollectionInfo(name=col.name) for col in collections]
             return ResultDTO.ok(data=converted)
         except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
+            return ResultDTO.fail(code=500, message=str(e))
+
+    async def delete_vector_data(self, request: DeleteVectorDataRequest) -> ResultDTO:
+        try:
+            if not await qdrant_client.client.collection_exists(request.collection_name):
+                return ResultDTO.fail(code=404, message="Collection not found")
+
+            filter_condition = models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="id",  
+                        match=models.MatchValue(value=request.id),
+                    )
+                ]
+            )
+
+            await qdrant_client.client.delete(
+                collection_name=request.collection_name,
+                points_selector=qdrant_models.FilterSelector(
+                    filter=filter_condition
+                )
+            )
+
+            return ResultDTO.ok(message=f"Deleted vector data ID {request.id} from collection '{request.collection_name}'")
+
+        except Exception as e:
+            return ResultDTO.fail(code=500, message=f"Deletion failed: {str(e)}")
         
     async def check_vector_data_exist(self, request: CheckVectorDataExistRequest) -> ResultDTO[bool]:
         try:
@@ -57,7 +84,7 @@ class VectorService:
 
             return ResultDTO.ok(data=exists)
         except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
+            return ResultDTO.fail(code=500, message=str(e))
      
     def generate_base_id(self, id: str) -> int:
         """ string base id switch int"""
@@ -111,7 +138,7 @@ class VectorService:
         """generate collections"""
         try:
             if await qdrant_client.client.collection_exists(request.collection_name):
-                return ResultDTO.fail(code=400, message="Collection already exists")
+                return ResultDTO.fail(code=500, message="Collection already exists")
             
             vector_size: int = 768
             distance: str = "COSINE"
@@ -124,7 +151,7 @@ class VectorService:
             )
             return ResultDTO.ok(message=f"Collection {request.collection_name} create Successful")
         except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
+            return ResultDTO.fail(code=500, message=str(e))
         
     def expand_query(self, query: str) -> str:
         """expand query"""
@@ -146,7 +173,7 @@ class VectorService:
             return ResultDTO.fail(code=404, message="Collection not found")
         return None
 
-    def build_search_filter(self, id: str) -> Filter:
+    def build_search_filter(self, id: int) -> Filter:
         """build search filter"""
         must_conditions = [
             FieldCondition(
@@ -215,7 +242,7 @@ class VectorService:
         
         return all_records
 
-    async def vector_semantic_search(self, collection_name: str, query_text: str, id: str) -> ResultDTO[List[VectorSearchResult]]:
+    async def vector_semantic_search(self, collection_name: str, query_text: str, id: int) -> ResultDTO[List[VectorSearchResult]]:
         """vector semantic search"""
         try:
             if error := await self.check_collection_exists(collection_name):
@@ -244,7 +271,7 @@ class VectorService:
             return ResultDTO.ok(data=filtered_results[:self.HARDCODE_LIMIT])
         
         except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
+            return ResultDTO.fail(code=500, message=str(e))
 
     async def vector_article_all_text_query(self, collection_name: str, id: str) -> ResultDTO[List[VectorSearchResult]]:
         """vector article all text query"""

@@ -2,7 +2,7 @@ from services.vectorService import VectorService
 from services.dependencies import get_vector_service
 from fastapi import APIRouter, HTTPException, Depends, Security
 
-from common.models.request.vectorRequest import CheckVectorDataExistRequest, GenerateCollectionRequest, VectorSearchRequest, UpsertCollectionRequest
+from common.models.request.vectorRequest import CheckVectorDataExistRequest, DeleteVectorDataRequest, GenerateCollectionRequest, VectorSearchRequest, UpsertCollectionRequest
 from common.core.auth import get_current_user
 from common.models.dto.resultdto import ResultDTO
 from common.models.response.vectorResponse import CollectionInfo, VectorSearchResult
@@ -29,8 +29,21 @@ async def check_vector_data_exist(
     service: VectorService = Depends(get_vector_service),
     user_payload: dict = Security(get_current_user, scopes=["authenticated"]),
 ) -> ResultDTO[List[CollectionInfo]]:
-    """Get all collection information"""
+    """check vector data exist"""
     result = await service.check_vector_data_exist(request)
+    if result.code == 200:
+        return result
+    else:
+        raise HTTPException(status_code=result.code, detail=result.message)
+    
+@router.delete("/delete_vector_data", response_model=ResultDTO)
+async def delete_vector_data(
+    request: DeleteVectorDataRequest, 
+    service: VectorService = Depends(get_vector_service),
+    user_payload: dict = Security(get_current_user, scopes=["authenticated"]),
+) -> ResultDTO[List[CollectionInfo]]:
+    """delete vector data"""
+    result = await service.delete_vector_data(request)
     if result.code == 200:
         return result
     else:
