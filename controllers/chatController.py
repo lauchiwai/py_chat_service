@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Security
 router = APIRouter(prefix="/Chat", tags=["Chat Management"])
 @router.get("/getChatHistoryBySessionId/{chat_session_id}")
 async def get_chat_history_by_session_id(
-    chat_session_id: str,
+    chat_session_id: int,
     service: ChatService = Depends(get_chat_service),
     user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ):
@@ -22,7 +22,7 @@ async def get_chat_history_by_session_id(
     
 @router.delete("/deleteChatHistoryBySessionId/{chat_session_id}")
 async def delete(
-    chat_session_id: str,
+    chat_session_id: int,
     service: ChatService = Depends(get_chat_service),
     user_payload: dict = Security(get_current_user, scopes=["authenticated"]) 
 ):

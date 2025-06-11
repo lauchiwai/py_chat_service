@@ -30,7 +30,7 @@ class ChatService:
             max_tokens=self.max_tokens
         )
 
-    async def get_chat_history_by_session_id(self, chat_session_id: str):
+    async def get_chat_history_by_session_id(self, chat_session_id: int):
         try:
             chat_history = await self.db.histories.find_one({"chat_session_id": chat_session_id})
             if not chat_history:
@@ -45,9 +45,9 @@ class ChatService:
             })
             
         except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
+            return ResultDTO.fail(code=500, message=str(e))
         
-    async def delete_chat_history_by_session_id(self, chat_session_id: str):
+    async def delete_chat_history_by_session_id(self, chat_session_id: int):
         try:
             chat_history = await self.db.histories.find_one({"chat_session_id": chat_session_id})
             if not chat_history:
@@ -66,7 +66,7 @@ class ChatService:
                 )
             
         except Exception as e:
-            return ResultDTO.fail(code=400, message=str(e))
+            return ResultDTO.fail(code=500, message=str(e))
 
     async def chat_stream_endpoint(self, request: ChatRequest):
         async def event_stream():
@@ -116,6 +116,8 @@ class ChatService:
                     request.collection_name,
                     request.article_id
                 )
+                print("request : ", request)
+                print("article_all_text : ", article_all_text)
                 context_str = "\n".join([item.text for item in article_all_text.data])
                 system_prompt = self.prompt_templates.summary_engineer()
                 enhanced_messages = [
