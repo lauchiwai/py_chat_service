@@ -116,8 +116,7 @@ class ChatService:
                     request.collection_name,
                     request.article_id
                 )
-                print("request : ", request)
-                print("article_all_text : ", article_all_text)
+
                 context_str = "\n".join([item.text for item in article_all_text.data])
                 system_prompt = self.prompt_templates.summary_engineer()
                 enhanced_messages = [

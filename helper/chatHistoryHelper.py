@@ -24,7 +24,7 @@ class ChatHistoryHelper:
 
     def generate_chat_history(self, chat_session_id: str, user_id: str, message: Optional[str] = None) -> dict:
         messages = [
-            self.create_message("system", self.prompt_templates.general_assistant)
+            self.create_message("system", self.prompt_templates.general_assistant())
         ]
         
         if message and message.strip():

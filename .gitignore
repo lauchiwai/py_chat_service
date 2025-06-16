@@ -12,6 +12,8 @@ ENV/
 env.bak/
 venv.bak/
 
+.history
+
 # 虚拟环境（如你的 myenv 目录）
 myenv/
 

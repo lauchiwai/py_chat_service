@@ -1,5 +1,4 @@
 import asyncio
-
 from typing import Optional
 from core.llm_init.prompt import PromptTemplates
 from models.request.articleRequest import ArticleGenerationRequest
@@ -7,7 +6,7 @@ from helper.llmStreamHelper import LLMStreamHelper
 
 class ArticleService:
     def __init__(self):
-        self.max_tokens: Optional[int] = 1024 
+        self.max_tokens: Optional[int] = 2048 
         self.temperature: Optional[float] = 0.7
         self.default_model = "deepseek-chat"
         self.prompt_templates = PromptTemplates()
@@ -27,10 +26,10 @@ class ArticleService:
 
             try:
                 messages = [
-                    {"role": "system", "content": self.prompt_templates.article_writer},
+                    {"role": "system", "content": self.prompt_templates.article_writer()},
                     {"role": "user", "content": request.prompt}
                 ]
-
+                
                 async for data_chunk, content in self.llm_stream_helper.handle_stream_response(
                     enhanced_messages=messages,
                     task=asyncio.current_task(),
@@ -41,9 +40,7 @@ class ArticleService:
                 yield "event: end\ndata: {}\n\n"
 
             except Exception as e:
-                error_msg = str(e)
+                error_msg = f"Stream generation failed: {str(e)}"
                 yield self.llm_stream_helper.generate_error_event(error_msg)
 
         return self.llm_stream_helper.create_streaming_response(event_stream())
-        
-    
