@@ -16,10 +16,17 @@ FROM python:3.11-slim
 
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
-    PYTHONPATH="/app"
+    PYTHONPATH="/app" \
+    UVICORN_MAX_REQUEST_BODY_SIZE=30000000 \
+    UVICORN_MAX_HEADERS=8192 \
+    UVICORN_LIMIT_CONCURRENCY=1000 \
+    UVICORN_TIMEOUT_KEEP_ALIVE=60
 
 RUN apt-get update && apt-get install -y \
     libgomp1 \
+    && echo "fs.file-max = 100000" >> /etc/sysctl.conf \
+    && echo "* soft nofile 65535" >> /etc/security/limits.conf \
+    && echo "* hard nofile 65535" >> /etc/security/limits.conf \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
