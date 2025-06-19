@@ -72,17 +72,19 @@ class ChatService:
         async def event_stream():
             full_response = ""
             client_disconnected = [False]
+            chat_history = None
 
             try:
                 chat_history = await self.history_helper.get_or_create(request)
+
                 if request.message:
                     self.history_helper.append_message(chat_history, request.message, "user")
                 
                 if not request.collection_name:
-                    enhanced_messages =  chat_history["messages"]
+                    enhanced_messages = chat_history["messages"]
                 else:
                     search_result = await self.vector_helper.semantic_search(request)
-                    enhanced_messages =  self.llm_stream_helper.generate_enhanced_messages(search_result, chat_history)
+                    enhanced_messages = self.llm_stream_helper.generate_enhanced_messages(search_result, chat_history)
                 
                 async for data_chunk, content in self.llm_stream_helper.handle_stream_response(
                     enhanced_messages=enhanced_messages,
@@ -97,7 +99,6 @@ class ChatService:
             except Exception as e:
                 error_msg = str(e)
                 yield self.llm_stream_helper.generate_error_event(error_msg)
-                self.history_helper.append_message(chat_history, f"系統錯誤: {error_msg}", "system")
 
             finally:
                 if chat_history:
@@ -109,9 +110,11 @@ class ChatService:
         async def event_stream():
             full_response = ""
             client_disconnected = [False]
+            chat_history = None
 
             try:
                 chat_history = await self.history_helper.get_or_create(request)
+                
                 article_all_text = await self.vector_helper.get_article_text(
                     request.collection_name,
                     request.article_id
@@ -123,7 +126,7 @@ class ChatService:
                     {"role": "system", "content": context_str.strip()},
                     {"role": "system", "content": system_prompt.strip()}
                 ]
-
+                
                 async for data_chunk, content in self.llm_stream_helper.handle_stream_response(
                     enhanced_messages=enhanced_messages,
                     task=asyncio.current_task(),

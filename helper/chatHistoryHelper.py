@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Optional, Union
 from models.request.chatRequest import ChatRequest, SummaryRequest
-import asyncio
 from functools import partial
+import asyncio
 
 class ChatHistoryHelper:
     def __init__(self, db, prompt_templates, temperature=0.7, max_tokens=3000):
@@ -16,13 +16,14 @@ class ChatHistoryHelper:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def create_message(self, role: str, content: str) -> dict:
-        return {
+        msg = {
             "role": role,
             "content": content.strip(),
             "timestamp": self.get_current_timestamp()
         }
+        return msg
 
-    def generate_chat_history(self, chat_session_id: str, user_id: str, message: Optional[str] = None) -> dict:
+    def generate_chat_history(self, chat_session_id: int, user_id: int, message: Optional[str] = None) -> dict:
         messages = [
             self.create_message("system", self.prompt_templates.general_assistant())
         ]
@@ -50,7 +51,7 @@ class ChatHistoryHelper:
         
         return chat_history
     
-    def create(self, request: Union[ChatRequest, SummaryRequest]) :
+    def create(self, request: Union[ChatRequest, SummaryRequest]):
         message = request.message if isinstance(request, ChatRequest) else None
         return self.generate_chat_history(
             request.chat_session_id,
@@ -66,6 +67,7 @@ class ChatHistoryHelper:
             return
         
         try:
+            session_id = chat_history.get("chat_session_id", "unknown")
             if "_id" in chat_history:
                 await self.db.histories.replace_one(
                     {"_id": chat_history["_id"]},
@@ -75,20 +77,24 @@ class ChatHistoryHelper:
             else:
                 await self.db.histories.insert_one(chat_history)
         except Exception as e:
-            print(f"Database save error: {str(e)}")
             raise
 
     def log_save_result(self, task, chat_history: dict):
+        session_id = chat_history.get("chat_session_id", "unknown")
         try:
             task.result() 
-            print(f"[Success] Saved: {chat_history['chat_session_id']}")
         except asyncio.CancelledError:
-            print(f"[Error] Save cancelled: {chat_history['chat_session_id']}")
+            pass
         except Exception as e:
-            print(f"[Error] Save failed: {str(e)}")
+            pass
 
     async def finalize(self, chat_history: dict, full_response: str):
-        self.append_message(chat_history, full_response, "assistant")
+        if not chat_history:
+            return
+            
+        if full_response:
+            self.append_message(chat_history, full_response, "assistant")
+        
         save_task = asyncio.create_task(self.async_save(chat_history))
         save_task.add_done_callback(
             partial(self.log_save_result, chat_history=chat_history)
