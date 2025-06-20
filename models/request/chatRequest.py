@@ -7,7 +7,6 @@ class BaseRequest(BaseModel):
     article_id: Union[int, None] = None
     collection_name: Union[str, None] = Field(default=None)
     
-    
 class ChatRequest(BaseRequest) :
     message: str
     

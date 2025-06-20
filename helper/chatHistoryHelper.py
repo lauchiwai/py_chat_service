@@ -2,10 +2,13 @@ from datetime import datetime
 from typing import Optional, Union
 from models.request.chatRequest import ChatRequest, SummaryRequest
 from functools import partial
+from core.llm_init.prompt import PromptTemplates
 import asyncio
 
+from models.request.sceneChatRequest import SceneChatRequest
+
 class ChatHistoryHelper:
-    def __init__(self, db, prompt_templates, temperature=0.7, max_tokens=3000):
+    def __init__(self, db, prompt_templates: PromptTemplates, temperature=0.7, max_tokens=3000):
         self.db = db
         self.prompt_templates = prompt_templates
         self.temperature = temperature
@@ -23,9 +26,9 @@ class ChatHistoryHelper:
         }
         return msg
 
-    def generate_chat_history(self, chat_session_id: int, user_id: int, message: Optional[str] = None) -> dict:
+    def generate_chat_history(self, chat_session_id: int, user_id: int, prompt: str, message: Optional[str] = None) -> dict:
         messages = [
-            self.create_message("system", self.prompt_templates.general_assistant())
+            self.create_message("system", prompt)
         ]
         
         if message and message.strip():
@@ -41,24 +44,45 @@ class ChatHistoryHelper:
             }
         }
 
-    async def get_or_create(self, request: Union[ChatRequest, SummaryRequest]) -> dict:
+    async def get_or_create(self, request: Union[ChatRequest, SceneChatRequest, SummaryRequest]) -> dict:
         chat_history = await self.db.histories.find_one(
             {"chat_session_id": request.chat_session_id}
         )
         
         if not chat_history:
-            return self.create(request)
+            if isinstance(request, ChatRequest):
+                chat_history = self.CreateChatHistory(request)
+            elif isinstance(request, SummaryRequest):
+                chat_history = self.CreateSummaryHistory(request)
+            elif isinstance(request, SceneChatRequest):
+                chat_history = self.CreateSceneChatHistory(request)
         
         return chat_history
     
-    def create(self, request: Union[ChatRequest, SummaryRequest]):
-        message = request.message if isinstance(request, ChatRequest) else None
+    def CreateChatHistory(self, request: ChatRequest) :
         return self.generate_chat_history(
             request.chat_session_id,
             request.user_id,
-            message
+            self.prompt_templates.general_assistant(),
+            request.message
         )
-
+        
+    def CreateSummaryHistory(self, request: SummaryRequest) :
+        return self.generate_chat_history(
+            request.chat_session_id,
+            request.user_id,
+            self.prompt_templates.general_assistant(),
+            None
+        )
+        
+    def CreateSceneChatHistory(self, request: SceneChatRequest) :
+        return self.generate_chat_history(
+            request.chat_session_id,
+            request.user_id,
+            self.prompt_templates.english_scene_chat(request.message),
+            request.message
+        )
+    
     def append_message(self, chat_history: dict, content: str, role: str):
         chat_history["messages"].append(self.create_message(role, content))
 
