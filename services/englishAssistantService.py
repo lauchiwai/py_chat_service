@@ -16,7 +16,6 @@ class EnglishAssistantService:
         self.api_timeout = 10 
         
         self.llm_stream_helper = LLMStreamHelper(
-            prompt_templates=self.prompt_templates,
             temperature=self.temperature,
             max_tokens=self.max_tokens
         )

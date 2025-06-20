@@ -25,7 +25,6 @@ class ChatService:
         )
         self.vector_helper = VectorHelper(vector_service)
         self.llm_stream_helper = LLMStreamHelper(
-            prompt_templates=self.prompt_templates,
             temperature=self.temperature,
             max_tokens=self.max_tokens
         )
@@ -84,7 +83,7 @@ class ChatService:
                     enhanced_messages = chat_history["messages"]
                 else:
                     search_result = await self.vector_helper.semantic_search(request)
-                    enhanced_messages = self.llm_stream_helper.generate_enhanced_messages(search_result, chat_history)
+                    enhanced_messages = self.llm_stream_helper.generate_enhanced_messages(search_result, chat_history, self.prompt_templates.english_word_analysis)
                 
                 async for data_chunk, content in self.llm_stream_helper.handle_stream_response(
                     enhanced_messages=enhanced_messages,

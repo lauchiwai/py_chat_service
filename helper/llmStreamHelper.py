@@ -1,17 +1,22 @@
 import json
 import asyncio
+from typing import Callable, Optional
 from fastapi.responses import StreamingResponse
 from core.llm_init import deepseek
 
 class LLMStreamHelper:
-    def __init__(self, prompt_templates, temperature=0.7, max_tokens=3000):
-        self.prompt_templates = prompt_templates
+    def __init__(self, temperature=0.7, max_tokens=3000):
         self.temperature = temperature
         self.max_tokens = max_tokens
 
-    def generate_enhanced_messages(self, search_result, chat_history: dict):
+    def generate_enhanced_messages(
+        self, 
+        search_result, 
+        chat_history: dict, 
+        prompt_function: Callable[[Optional[str]], str]
+    ):
         context_str = "\n".join([item.text for item in search_result.data])
-        system_prompt = self.prompt_templates.rag_analyst(context_str)
+        system_prompt = prompt_function(context_str)
         filtered_messages = [msg for msg in chat_history["messages"] if msg["role"] != "system"]
         return [self.create_base_message("system", system_prompt), *filtered_messages]
 
