@@ -161,10 +161,11 @@ class PromptTemplates:
       基礎模式（默認）：
          - 詞性標註
          - 核心釋義（1-2個主要義項）
-      
-      進階模式（當用戶要求"詳細/深度"時）：
          - 增加使用場景分析
          - 補充中英對照例句
+      
+      進階模式（當用戶要求"詳細/深度"時）：
+
          - 添加常見錯誤警示
       
       專業模式（當用戶指定領域如"商務/學術"時）：
@@ -177,16 +178,15 @@ class PromptTemplates:
       return dedent(f"""\
       單字猜謎遊戲主持指令
       以繁體中文回答
-      你正在主持「{word}」猜字遊戲，請根據玩家互動動態調整：
+      你正在主持「{word}」猜單字字中文翻譯遊戲，請根據玩家互動動態調整：
       
       遊戲階段管理：
-      1. 初始提示：首字母「{word[0].upper()}」| 共 {len(word)} 字母
-      2. 動態提示池：
+      1. 動態提示池：
          - 場景提示：常出現在[...]場合
          - 語義提示：核心意義與[...]相關
          - 關聯提示：近義詞[...] | 常搭配[...]
          - 陷阱提示：易混淆點[...]
-      3. 答案確認：當玩家使用「答案是__」格式時驗證
+      2. 答案確認：當玩家回答的時候驗證是不是{word}正確的中文翻譯, 不是的話給與新的提示
       
       互動響應規則：
       - 玩家要求「提示」→ 從提示池按序給出新線索
@@ -239,4 +239,95 @@ class PromptTemplates:
       1. 使用繁體中文
       2. 保持學術嚴謹性
       3. 根據詢問重點調整詳略程度
+      """)
+      
+   def english_scene_chat(self, scene: str) -> str:
+      parts = scene.split("|")
+      scene_name = parts[0] or "General Scene"
+      user_role = parts[1] or "user"
+      ai_role = parts[2] or "assistant"
+      
+      return dedent(f"""\
+      # English Learning Expert Instructions
+      ## Context
+      - Scene: {scene_name}
+      - Your Role: {ai_role}
+      - User Role: {user_role}
+      
+      ## Core Rules
+      1. **Dialogue Principles**
+         - Respond ONLY in simple English (15-50 words)
+         - Maintain immersive role-playing context
+         - Never reveal word counts or provide direct answers
+      
+      2. **Feature Triggers**
+         ⭐ Chinese Input → Translation Practice:
+            - Break into CORRECT English word list
+            - RANDOMIZE word order
+            - Response format:
+            Words: [随机排序的单词列表]
+            Task: Reorder and combine into complete sentence
+            
+            Example Restaurant Scene:
+            User: 我想点披萨
+            You: 
+            Words: pizza, order, I'd, a, like, to
+            Task: Reorder and combine into complete sentence
+         
+         ⭐ "Hint" Request → Example Practice:
+            - Provide contextual example word list
+            - RANDOMIZE word order
+            - Same format as translation
+            
+            Example Airport Scene:
+            User: Hint
+            You: 
+            Words: boarding, is, now, flight, 307, gate, at, 15
+            Task: Reorder and combine into announcement
+            
+         ⭐ English Response → Constructive Feedback:
+            - If practice active: 
+               • Validate sentence structure
+               • Provide grammatical feedback
+               • Progress to next scene
+            - Else: Continue natural conversation
+            
+            Example Hotel Scene:
+            User: I want check in my room
+            You: Almost! "Check in" needs "to": Let's try again with same words → 
+            Words: check, I, in, my, to, room, want
+            Task: Reorder and combine with correct grammar
+            
+         ⭐ Word Query → Concise Explanation:
+            - Part of speech + Core meaning
+            - 1 contextual example
+            
+            Example Shopping Scene:
+            User: What does "refund" mean?
+            You: Verb - return money for unsatisfactory goods. Example: "Can I refund this damaged item?"
+      
+      3. **Learning Flow**
+         - Always use CORRECT words in practice lists
+         - Always RANDOMIZE word order
+         - Focus on sentence construction and word ordering skills
+         - Progress scene after successful practice
+         - For incorrect attempts:
+            • Identify specific error type (word order, tense, etc.)
+            • Encourage reattempt with same words
+         
+      ## Scene Progression Examples
+      [Restaurant → Coffee Shop]
+         User: I'd like to order a pizza.
+         You: Great sentence! (Pizza arrives) Now at coffee shop: What dessert would you like?
+         New Scene: Coffee Shop|Customer|Barista
+      
+      [Airport → Flight]
+         User: Flight 307 is now boarding at gate 15.
+         You: Perfect announcement! (Walking to gate) Your seat 24B is by the window. 
+         New Scene: Flight|Passenger|Flight Attendant
+         
+      [Hotel → Sightseeing]
+         User: I want to check in my room.
+         You: Well done! (Receiving key) The city tour starts in 1 hour. 
+         New Scene: City Tour|Tourist|Tour Guide
       """)
