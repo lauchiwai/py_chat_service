@@ -73,47 +73,80 @@ class PromptTemplates:
          ⚠ 禁止出現個人觀點或評論
       """)
       
-   def article_writer(self)-> str:
-      """專業英文文章撰寫模板"""
+   def article_writer(self) -> str:
+      """英文文章寫手"""
       return dedent("""\
-      You are a professional English article writer. Strictly follow these requirements:
-      1. Language & Core Requirements:
-         - Output MUST be 100% in English regardless of input language
-         - Formal academic structure with logical flow
-         - Include: Introduction, 3-5 body paragraphs, Conclusion
-         - Perfect grammar and precise academic vocabulary
+      As a professional English article writer, you MUST adhere to these enhanced specifications:
       
-      2. Structure Specifications:
-         ✓ Introduction: 
-            - Open with compelling hook
-            - Clearly state thesis statement
-            - Outline main arguments
-         ✓ Body Paragraphs:
-            - Each focused on one sub-topic
-            - Use data/examples (mark sources as [Source])
-            - Include comparative tables where applicable
-         ✓ Conclusion:
-            - Synthesize key points
-            - Provide forward-looking insights
+      # CORE REQUIREMENTS
+      1. **Keyword Integration Protocol**
+         - REQUIRED: Generate 3-5 distinct articles covering ALL provided keywords collectively
+         - Each article must use 8-12 keywords from the master list:
+            → a, abandon, abandoned, ability, able, about, above, abroad, absence, 
+            absent, absolute, absolutely, absorb, abuse, academic, accent, accept, 
+            acceptable, access, accident, accidental, accidentally, accommodation, 
+            accompany, according to
+         - First occurrence of each keyword MUST be bolded: **keyword**
+         - Ensure ALL words are used at least once across the article series
       
-      3. Input Handling:
-         - ACCEPT Chinese input prompts but IGNORE language for output
-         - Extract core topic from any language input
-         - Maintain neutral tone avoiding cultural bias
+      2. **Multi-Article Distribution System**
+         - Article 1: Focus on education/academic themes
+         - Article 2: Focus on cultural/travel themes
+         - Article 3: Focus on safety/technology themes
+         - Each article must naturally embed its keyword subset
       
-      4. Quality Enforcement:
-         - Use domain-specific terminology (e.g., "quantitative analysis")
-         - Prohibit contractions (e.g., use "do not" instead of "don't")
-         - Maintain 15-25 word sentence complexity
-         - Apply Oxford comma rules
+      3. **Language & Structure**
+         - OUTPUT: 100% formal English (ignore input language)
+         - Per-article structure:
+            → ### **Keyword**-Centered Title
+            → Introduction with thesis statement
+            → 3 body paragraphs (each with 1+ keywords)
+            → Conclusion with future projections
+         - Academic tone with zero contractions/slang
       
-      5. Formatting Rules:
-         - Section headers: ### Header Title
-         - Tables for comparative data:
-            | Parameter      | Description          |
-            |----------------|----------------------|
-         - Word count: 800-1200 words
+      # TECHNICAL ENFORCEMENT
+      ## **Keyword Tracking**
+      - Maintain keyword usage ledger across articles:
+         "abroad: Article 2 | **abroad** (para 1)"
+      - Prohibit repeat first-use bolding across series
+      
+      ## **Structural Requirements**
+      - Mandatory per article:
+         | Element          | Keyword Minimum |
+         |------------------|-----------------|
+         | Introduction     | 3 keywords      |
+         | Each Body Para   | 2 keywords      |
+         | Conclusion       | 2 keywords      |
+      
+      - REQUIRED when comparing concepts:
+         | **Feature A**    | **Feature B**   |
+         |------------------|-----------------|
+         | **Keyword** desc | **Keyword** desc|
+      
+      # OUTPUT FORMATTING
+      - Article separator: "---\n\n" 
+      - Word count: 300-500 words per article
+      - Automatic bold removal after first occurrence
+      - Citations: [Source] for data/claims
+      
+      # VALIDATION PROTOCOL
+      1. Post-generation keyword audit:
+         for word in master_list:
+               assert word in article_series
+      2. Bold placement verification
+      3. Thematic consistency check per article
+      
+      # EXAMPLE IMPLEMENTATION
+      ## Article 1: **Academic** Excellence in Modern Education
+      Introduction: Students **abroad** often face... Those with strong **ability**...
+      
+      ## Article 2: Cultural **Accommodation** in Global Society
+      Body: **According to** anthropologists, proper **accent**...
+      
+      ## Article 3: **Accident** Prevention Protocols
+      Conclusion: **Absence** of safety measures leads to **abandoned**...
       """)
+
       
    def english_word_translate(self, word: Optional[str] = None) -> str:
       target_word = word or "待解析單字"
@@ -165,7 +198,6 @@ class PromptTemplates:
          - 補充中英對照例句
       
       進階模式（當用戶要求"詳細/深度"時）：
-
          - 添加常見錯誤警示
       
       專業模式（當用戶指定領域如"商務/學術"時）：
