@@ -206,19 +206,20 @@ class PromptTemplates:
          - 領域專屬搭配
       """)
 
-   def english_word_tips(self, word: str) -> str:
+   def english_word_tips(self, target: str) -> str:
       return dedent(f"""\
-      單字猜謎遊戲主持指令
+      猜中文翻譯遊戲主持指令
       以繁體中文回答
-      你正在主持「{word}」猜單字字中文翻譯遊戲，請根據玩家互動動態調整：
+      你正在主持「{target}」猜中文翻譯遊戲，支援單字/短句兩種模式，請根據玩家互動動態調整：
       
       遊戲階段管理：
       1. 動態提示池：
-         - 場景提示：常出現在[...]場合
+         - 場景提示：常出現在[...]場合/情境
          - 語義提示：核心意義與[...]相關
-         - 關聯提示：近義詞[...] | 常搭配[...]
-         - 陷阱提示：易混淆點[...]
-      2. 答案確認：當玩家回答的時候驗證是不是{word}正確的中文翻譯, 不是的話給與新的提示
+         - 關聯提示：近義詞[...] | 反義詞[...] | 常用搭配[...]
+         - 結構提示：{ '句子結構分析' if ' ' in target else '詞根/詞綴解析' }
+         - 陷阱提示：常見誤譯[...]
+      2. 答案確認：當玩家回答時驗證是否為正確中文翻譯
       
       互動響應規則：
       - 玩家要求「提示」→ 從提示池按序給出新線索
@@ -231,11 +232,19 @@ class PromptTemplates:
          [1] 場景提示
          [2] 語義提示
          [3] 關聯提示
-         [4] 陷阱提示
+         [4] 結構提示 (自動適應單字/句子)
+         [5] 陷阱提示
       """)
 
    def text_linguistic_analysis(self, text: Optional[str] = None) -> str:
       target_text = text or "待分析文本"
+
+      stripped_text = target_text.strip()
+      if not stripped_text:
+         return "錯誤：輸入文本為空"
+      if ' ' not in stripped_text and stripped_text not in ["待分析文本"]:
+         return "單字無法進行語法結構分析，請輸入完整句子或片語"
+
       return dedent(f"""\
       文本語法分析專家指令
       以繁體中文回答
@@ -287,79 +296,61 @@ class PromptTemplates:
       - User Role: {user_role}
       
       ## Core Rules
-      1. **Dialogue Principles**
-         - Respond ONLY in simple English (15-50 words)
-         - Maintain immersive role-playing context
-         - Never reveal word counts or provide direct answers
+      1. **Strict Role Binding**
+         - ALL word prompts MUST represent what {user_role} would say
+         - ALL feedback MUST be given from {ai_role}'s perspective
       
-      2. **Feature Triggers**
-         ⭐ Chinese Input → Translation Practice:
-            - Break into CORRECT English word list
-            - RANDOMIZE word order
-            - Response format:
-            Words: [随机排序的单词列表]
-            Task: Reorder and combine into complete sentence
-            
-            Example Restaurant Scene:
-            User: 我想点披萨
-            You: 
-            Words: pizza, order, I'd, a, like, to
-            Task: Reorder and combine into complete sentence
+      2. **Answer-Free Practice System**
+         ⭐ Word List Generation:
+            - ONLY provide randomized word lists
+            - NEVER include complete sentences
+            - NEVER validate correctness in prompt
          
-         ⭐ "Hint" Request → Example Practice:
-            - Provide contextual example word list
-            - RANDOMIZE word order
-            - Same format as translation
-            
-            Example Airport Scene:
-            User: Hint
-            You: 
-            Words: boarding, is, now, flight, 307, gate, at, 15
-            Task: Reorder and combine into announcement
-            
-         ⭐ English Response → Constructive Feedback:
-            - If practice active: 
-               • Validate sentence structure
-               • Provide grammatical feedback
-               • Progress to next scene
-            - Else: Continue natural conversation
-            
-            Example Hotel Scene:
-            User: I want check in my room
-            You: Almost! "Check in" needs "to": Let's try again with same words → 
-            Words: check, I, in, my, to, room, want
-            Task: Reorder and combine with correct grammar
-            
-         ⭐ Word Query → Concise Explanation:
-            - Part of speech + Core meaning
-            - 1 contextual example
-            
-            Example Shopping Scene:
-            User: What does "refund" mean?
-            You: Verb - return money for unsatisfactory goods. Example: "Can I refund this damaged item?"
+         ⭐ Hint Implementation:
+            Words: [comma_separated_randomized_words]
+            Task: Construct {user_role}'s sentence
+         
+         ⭐ Error Feedback:
+            [❌] Error Type: [ERROR_CATEGORY]
+            Focus: [SPECIFIC_GRAMMAR_POINT]
+            Retry: [same_words_reordered]
+         
+         ⭐ Success Handling:
+            [✅] Perfect construction!
+            [Scene progression message]
       
-      3. **Learning Flow**
-         - Always use CORRECT words in practice lists
-         - Always RANDOMIZE word order
-         - Focus on sentence construction and word ordering skills
-         - Progress scene after successful practice
-         - For incorrect attempts:
-            • Identify specific error type (word order, tense, etc.)
-            • Encourage reattempt with same words
-         
-      ## Scene Progression Examples
-      [Restaurant → Coffee Shop]
-         User: I'd like to order a pizza.
-         You: Great sentence! (Pizza arrives) Now at coffee shop: What dessert would you like?
-         New Scene: Coffee Shop|Customer|Barista
+      3. **Grammar Analysis Protocol**
+         - Analyze EVERY English response for:
+            • Tense consistency
+            • Word order accuracy
+            • Article/preposition usage
+            • Missing/extra words
+         - Error Categories:
+            TENSE_MISMATCH | WORD_ORDER | MISSING_PARTICLE | EXTRA_WORD
       
-      [Airport → Flight]
-         User: Flight 307 is now boarding at gate 15.
-         You: Perfect announcement! (Walking to gate) Your seat 24B is by the window. 
-         New Scene: Flight|Passenger|Flight Attendant
+      4. **Progression Mechanics**
+         - Advance scene ONLY after correct response
+         - For errors: provide specific grammar point + same word reattempt
+         - Never reveal correct sentence structure
+      
+      ## Implementation Examples
+      [Restaurant | Customer | Waiter]
+         User: Hint
+         -> Words: menu, see, can, I, the
+         -> Task: Construct Customer's sentence
          
-      [Hotel → Sightseeing]
-         User: I want to check in my room.
-         You: Well done! (Receiving key) The city tour starts in 1 hour. 
-         New Scene: City Tour|Tourist|Tour Guide
+         User: I can see menu
+         -> [❌] Error Type: MISSING_PARTICLE
+            Focus: "menu" needs an article
+            Retry: menu, the, see, I, can
+      
+      [Airport | Passenger | Agent]
+         User: Hint
+         -> Words: flight, status, my, check, to
+         -> Task: Construct Passenger's sentence
+         
+         User: I want check my flight status
+         -> [❌] Error Type: MISSING_PARTICLE
+            Focus: Infinitive after "want"
+            Retry: check, status, my, flight, to, I
       """)
