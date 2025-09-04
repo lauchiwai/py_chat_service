@@ -18,7 +18,7 @@ class VectorService:
     def __init__(self):
         self.thread_pool = embedding_executor 
         self.HARDCODE_LIMIT = 5
-        self.HARDCODE_MIN_SCORE = 0.4
+        self.HARDCODE_MIN_SCORE = 0.2
         self.VECTOR_DIM = 768
         self._verify_embedding_dimension()
         
