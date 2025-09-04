@@ -216,13 +216,18 @@ class VectorService:
         return None
 
     def build_search_filter(self, id: int) -> Filter:
+        print(f"[DEBUG] 構建過濾條件，ID={id}")
+        
         must_conditions = [
             FieldCondition(
                 key="id",
                 match=MatchValue(value=id)
             )
         ]
-        return Filter(must=must_conditions)
+        
+        filter_obj = Filter(must=must_conditions)
+        print(f"[DEBUG] 過濾條件對象: {filter_obj}")
+        return filter_obj
     
     def format_result_text(self, point_id: int, original_text: str, max_length: int = 300) -> str:
         prefix = f"[相關資料 {point_id}] "
@@ -294,14 +299,30 @@ class VectorService:
         return all_records
 
     async def vector_semantic_search(self, collection_name: str, query_text: str, id: int) -> ResultDTO[List[VectorSearchResult]]:
+        print(f"[DEBUG] 開始 RAG 搜索: 集合={collection_name}, 查詢='{query_text}', ID={id}")
+        
         try:
+            # 檢查集合是否存在
             if error := await self.check_collection_exists(collection_name):
+                print(f"[ERROR] 集合檢查失敗: {error}")
                 return error
             
-            search_filter = self.build_search_filter(id=id)
+            print(f"[DEBUG] 集合 '{collection_name}' 存在，開始構建搜索過濾條件")
+            
+            # 構建搜索過濾條件
+            search_filter = self.build_search_filter(id)
+            print(f"[DEBUG] 搜索過濾條件: {search_filter}")
+            
+            # 擴展查詢
             expanded_query = self.expand_query(query_text)
+            print(f"[DEBUG] 擴展後的查詢: '{expanded_query}'")
+            
+            # 增強編碼
             query_vector = await self.enhance_encoding(expanded_query)
-
+            print(f"[DEBUG] 查詢向量維度: {len(query_vector)}")
+            
+            # 執行搜索
+            print(f"[DEBUG] 執行 Qdrant 搜索: 集合={collection_name}, 限制={self.HARDCODE_LIMIT*2}, 分數閾值={self.HARDCODE_MIN_SCORE}")
             hits = await qdrant_client.client.search(
                 collection_name=collection_name,
                 query_vector=query_vector,
@@ -311,6 +332,9 @@ class VectorService:
             )
             
             filtered_results = []
+            print(f"[DEBUG] 搜索完成，找到 {len(hits)} 個結果")
+            
+            print(f"[DEBUG] 處理 {len(hits)} 個搜索結果")
             for hit in hits:
                 if hit.score < self.HARDCODE_MIN_SCORE:
                     continue
