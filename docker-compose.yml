@@ -12,6 +12,7 @@ services:
       - rbmq-network
       - my_mongoDB_network
       - chat_service_network
+    restart: always
     deploy:
       resources:
         limits:
