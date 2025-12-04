@@ -1,7 +1,6 @@
 from helper.chatHistoryHelper import ChatHistoryHelper
 from helper.llmStreamHelper import LLMStreamHelper
 from helper.vectorHelper import VectorHelper
-from models.request.sceneChatRequest import SceneChatRequest
 from services.vectorService import VectorService
 from typing import Optional
 
@@ -141,40 +140,6 @@ class ChatService:
                 error_msg = str(e)
                 yield self.llm_stream_helper.generate_error_event(error_msg)
                 
-            finally:
-                if chat_history:
-                    await self.history_helper.finalize(chat_history, full_response)
-
-        return self.llm_stream_helper.create_streaming_response(event_stream())
-    
-    async def scene_chat_stream_endpoint(self, request: SceneChatRequest):
-        async def event_stream():
-            full_response = ""
-            client_disconnected = [False]
-            chat_history = None
-
-            try:
-                chat_history = await self.history_helper.get_or_create(request)
-
-                if request.message:
-                    self.history_helper.append_message(chat_history, request.message, "user")
-                
-                enhanced_messages = chat_history["messages"]
-
-                async for data_chunk, content in self.llm_stream_helper.handle_stream_response(
-                    enhanced_messages=enhanced_messages,
-                    task=asyncio.current_task(),
-                    client_disconnected=client_disconnected
-                ):
-                    full_response += content
-                    yield data_chunk
-                
-                yield "event: end\ndata: {}\n\n"
-
-            except Exception as e:
-                error_msg = str(e)
-                yield self.llm_stream_helper.generate_error_event(error_msg)
-
             finally:
                 if chat_history:
                     await self.history_helper.finalize(chat_history, full_response)

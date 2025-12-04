@@ -5,8 +5,6 @@ from functools import partial
 from core.llm_init.prompt import PromptTemplates
 import asyncio
 
-from models.request.sceneChatRequest import SceneChatRequest
-
 class ChatHistoryHelper:
     def __init__(self, db, prompt_templates: PromptTemplates, temperature=0.7, max_tokens=3000):
         self.db = db
@@ -44,7 +42,7 @@ class ChatHistoryHelper:
             }
         }
 
-    async def get_or_create(self, request: Union[ChatRequest, SceneChatRequest, SummaryRequest]) -> dict:
+    async def get_or_create(self, request: Union[ChatRequest, SummaryRequest]) -> dict:
         chat_history = await self.db.histories.find_one(
             {"chat_session_id": request.chat_session_id}
         )
@@ -54,8 +52,6 @@ class ChatHistoryHelper:
                 chat_history = self.CreateChatHistory(request)
             elif isinstance(request, SummaryRequest):
                 chat_history = self.CreateSummaryHistory(request)
-            elif isinstance(request, SceneChatRequest):
-                chat_history = self.CreateSceneChatHistory(request)
         
         return chat_history
     
@@ -73,14 +69,6 @@ class ChatHistoryHelper:
             request.user_id,
             self.prompt_templates.general_assistant(),
             None
-        )
-        
-    def CreateSceneChatHistory(self, request: SceneChatRequest) :
-        return self.generate_chat_history(
-            request.chat_session_id,
-            request.user_id,
-            self.prompt_templates.english_scene_chat(request.message),
-            request.message
         )
     
     def append_message(self, chat_history: dict, content: str, role: str):

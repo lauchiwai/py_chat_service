@@ -1,4 +1,3 @@
-from models.request.sceneChatRequest import SceneChatRequest
 from services.chatService import ChatService
 from services.dependencies import get_chat_service
 
@@ -49,11 +48,3 @@ async def summary_stream(
     user_payload: dict = Security(get_current_user, scopes=["authenticated"])
 ):
     return await service.summary_stream_endpoint(request)
-
-@router.post("/scene_chat_stream")
-async def scene_chat_stream(
-    request: SceneChatRequest,
-    service: ChatService = Depends(get_chat_service),
-    user_payload: dict = Security(get_current_user, scopes=["authenticated"])
-):
-    return await service.scene_chat_stream_endpoint(request)
