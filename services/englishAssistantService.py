@@ -20,31 +20,6 @@ class EnglishAssistantService:
             max_tokens=self.max_tokens
         )
         
-    async def stream_english_word_tips(self, request: WordAssistantRequest):
-        async def event_stream():
-            client_disconnected = [False]
-
-            try:
-                messages = [
-                    {"role": "system", "content": self.prompt_templates.english_word_tips(request.word)},
-                    {"role": "user", "content": request.message}
-                ]
-
-                async for data_chunk, content in self.llm_stream_helper.handle_stream_response(
-                    enhanced_messages=messages,
-                    task=asyncio.current_task(),
-                    client_disconnected=client_disconnected
-                ):
-                    yield data_chunk
-                
-                yield "event: end\ndata: {}\n\n"
-
-            except Exception as e:
-                error_msg = str(e)
-                yield self.llm_stream_helper.generate_error_event(error_msg)
-
-        return self.llm_stream_helper.create_streaming_response(event_stream())
-    
     async def stream_english_word_translate(self, request: WordAssistantRequest):
         async def event_stream():
             client_disconnected = [False]

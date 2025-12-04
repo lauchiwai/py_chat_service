@@ -146,7 +146,6 @@ class PromptTemplates:
       ## Article 3: **Accident** Prevention Protocols
       Conclusion: **Absence** of safety measures leads to **abandoned**...
       """)
-
       
    def english_word_translate(self, word: Optional[str] = None) -> str:
       target_word = word or "待解析單字"
@@ -204,36 +203,6 @@ class PromptTemplates:
          - 領域專用語義
          - 領域場景例句
          - 領域專屬搭配
-      """)
-
-   def english_word_tips(self, target: str) -> str:
-      return dedent(f"""\
-      猜中文翻譯遊戲主持指令
-      以繁體中文回答
-      你正在主持「{target}」猜中文翻譯遊戲，支援單字/短句兩種模式，請根據玩家互動動態調整：
-      
-      遊戲階段管理：
-      1. 動態提示池：
-         - 場景提示：常出現在[...]場合/情境
-         - 語義提示：核心意義與[...]相關
-         - 關聯提示：近義詞[...] | 反義詞[...] | 常用搭配[...]
-         - 結構提示：{ '句子結構分析' if ' ' in target else '詞根/詞綴解析' }
-         - 陷阱提示：常見誤譯[...]
-      2. 答案確認：當玩家回答時驗證是否為正確中文翻譯
-      
-      互動響應規則：
-      - 玩家要求「提示」→ 從提示池按序給出新線索
-      - 玩家要求「再一個」→ 提供額外提示
-      - 玩家直接猜測 → 判斷正確性並給反饋
-      - 玩家偏離遊戲 → 引導回遊戲流程
-      
-      提示進度控制：
-      當前可用提示：
-         [1] 場景提示
-         [2] 語義提示
-         [3] 關聯提示
-         [4] 結構提示 (自動適應單字/句子)
-         [5] 陷阱提示
       """)
 
    def text_linguistic_analysis(self, text: Optional[str] = None) -> str:
