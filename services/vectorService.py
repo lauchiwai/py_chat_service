@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from qdrant_client.models import PointStruct, VectorParams, Distance, Filter, FieldCondition, MatchValue
 from typing import List, Dict, Optional
 from qdrant_client.http import models as qdrant_models
+from helper.hybridSearchHelper import HybridSearchHelper
 
 max_workers = min(32, (os.cpu_count() or 4) + 4) 
 embedding_executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -17,8 +18,9 @@ embedding_executor = ThreadPoolExecutor(max_workers=max_workers)
 class VectorService:
     def __init__(self):
         self.thread_pool = embedding_executor 
-        self.HARDCODE_LIMIT = 5
-        self.HARDCODE_MIN_SCORE = 0.2
+        self.hybrid_helper = HybridSearchHelper(self)
+        self.HARDCODE_LIMIT = 10
+        self.HARDCODE_MIN_SCORE = 0.1
         self.VECTOR_DIM = 768
         self._verify_embedding_dimension()
         
@@ -369,3 +371,44 @@ class VectorService:
         except Exception as e:
             print(f"文章文本查詢失敗: {str(e)}")
             return ResultDTO.fail(code=500, message="Internal server error")
+        
+    async def vector_hybrid_search(
+        self, 
+        collection_name: str, 
+        query_text: str, 
+        id: int,
+        alpha: float = 0.7,
+        use_keyword_search: bool = True
+    ) -> ResultDTO[List[VectorSearchResult]]:
+        """混合搜尋介面"""
+        try:
+            result = await self.hybrid_helper.hybrid_search(
+                collection_name=collection_name,
+                query_text=query_text,
+                article_id=id,
+                alpha=alpha,
+                use_keyword_search=use_keyword_search,
+                keyword_weight=0.3
+            )
+            return result
+        except Exception as e:
+            print(f"混合搜尋介面失敗: {str(e)}")
+            return ResultDTO.fail(code=500, message=str(e))
+    
+    async def vector_keyword_search(
+        self,
+        collection_name: str,
+        query_text: str,
+        id: int
+    ) -> ResultDTO[List[VectorSearchResult]]:
+        """關鍵字搜尋介面"""
+        try:
+            result = await self.hybrid_helper._keyword_search(
+                collection_name=collection_name,
+                query_text=query_text,
+                article_id=id
+            )
+            return result
+        except Exception as e:
+            print(f"關鍵字搜尋介面失敗: {str(e)}")
+            return ResultDTO.fail(code=500, message=str(e))

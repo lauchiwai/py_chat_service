@@ -24,6 +24,7 @@ class ChatService:
             max_tokens=self.max_tokens
         )
         self.vector_helper = VectorHelper(vector_service)
+        self.vector_helper.set_search_mode("hybrid")
         self.llm_stream_helper = LLMStreamHelper(
             temperature=self.temperature,
             max_tokens=self.max_tokens
@@ -82,8 +83,13 @@ class ChatService:
                 if not request.collection_name:
                     enhanced_messages = chat_history["messages"]
                 else:
-                    search_result = await self.vector_helper.semantic_search(request)
-                    enhanced_messages = self.llm_stream_helper.generate_enhanced_messages(search_result, chat_history, self.prompt_templates.rag_analyst)
+                    # 使用混合搜尋
+                    search_result = await self.vector_helper.hybrid_search_with_rerank(request)
+                    enhanced_messages = self.llm_stream_helper.generate_enhanced_messages(
+                        search_result, 
+                        chat_history, 
+                        self.prompt_templates.rag_analyst
+                    )
                 
                 async for data_chunk, content in self.llm_stream_helper.handle_stream_response(
                     enhanced_messages=enhanced_messages,
@@ -104,7 +110,7 @@ class ChatService:
                     await self.history_helper.finalize(chat_history, full_response)
 
         return self.llm_stream_helper.create_streaming_response(event_stream())
-
+    
     async def summary_stream_endpoint(self, request: SummaryRequest):
         async def event_stream():
             full_response = ""
